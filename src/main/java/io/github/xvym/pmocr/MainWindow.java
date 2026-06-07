@@ -35,7 +35,7 @@ final class MainWindow extends JFrame {
     private Rectangle captureArea;
 
     MainWindow() {
-        super("宝可梦 金/银 日文像素文字 OCR");
+        super("宝可梦 金/银 日文像素文字 OCR @自信过剩");
         recognizer = new RealtimeRecognizer(new PokemonOcr(), new RealtimeRecognizer.Listener() {
             @Override
             public void onStatus(final String value) {

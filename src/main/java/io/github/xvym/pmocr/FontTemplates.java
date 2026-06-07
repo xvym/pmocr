@@ -8,13 +8,13 @@ final class FontTemplates {
     private static final String CHARACTERS =
             "!0123456789×▶▷▼♀♂。" +
             "あいうえおかきくけこさしすせそたちっつてとなにぬねのはひふへほまみむめもゃやゅゆょよらるれろわをん゛゜" +
-            "ァアィイゥウェエォオカキクケコサシスセソタチッツテトナニヌネノハヒフホマミムメモャヤュユョヨラリルレロワヲンー円．／？…";
+            "ァアィイゥウェエォオカキクケコサシスセソタチッツテトナニヌネノハヒフホマミムメモャヤュユョヨラリルレロワヲンー円．／？…「」『』";
 
     private final byte[][] tiles;
 
     FontTemplates() {
-        if (CHARACTERS.length() != 129) {
-            throw new IllegalStateException("字体字符映射不是 129 个字符");
+        if (CHARACTERS.length() != 133) {
+            throw new IllegalStateException("字体字符映射不是 133 个字符");
         }
         byte[] data = loadResource("/pokemon_gs_font_1bpp.bin");
         if (data.length != CHARACTERS.length() * 8) {
