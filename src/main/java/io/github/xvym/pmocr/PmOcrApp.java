@@ -57,6 +57,8 @@ public final class PmOcrApp {
             return;
         }
         System.out.println(result.getText());
+        System.out.println("翻译:");
+        System.out.println(XlsxTranslationRepository.loadDefault().translate(result.getText()));
         System.out.printf("倍率=%.2f, 平均误差=%.2f, 未知格=%d%n",
                 result.getScale(), result.getAverageDistance(), result.getUnknownCharacters());
     }

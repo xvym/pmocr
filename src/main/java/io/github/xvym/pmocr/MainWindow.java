@@ -6,6 +6,7 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
@@ -25,17 +26,21 @@ final class MainWindow extends JFrame {
     private static final Font BUTTON_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 18);
     private static final Font LABEL_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, 16);
     private static final Font OUTPUT_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, 28);
+    private static final Font TRANSLATION_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, 24);
 
     private final JTextArea output = new JTextArea(6, 34);
+    private final JTextArea translationOutput = new JTextArea(6, 34);
     private final JLabel status = new JLabel("请先圈选模拟器游戏画面");
     private final JLabel areaLabel = new JLabel("未选择区域");
     private final JButton startButton = new JButton("开始实时识别");
     private final JButton stopButton = new JButton("停止");
+    private final XlsxTranslationRepository translations;
     private final RealtimeRecognizer recognizer;
     private Rectangle captureArea;
 
     MainWindow() {
         super("宝可梦 金/银 日文像素文字 OCR @自信过剩");
+        translations = XlsxTranslationRepository.loadDefault();
         recognizer = new RealtimeRecognizer(new PokemonOcr(), new RealtimeRecognizer.Listener() {
             @Override
             public void onStatus(final String value) {
@@ -53,6 +58,7 @@ final class MainWindow extends JFrame {
                     @Override
                     public void run() {
                         output.setText(recognition.getText());
+                        translationOutput.setText(translations.translate(recognition.getText()));
                     }
                 });
             }
@@ -100,6 +106,11 @@ final class MainWindow extends JFrame {
         output.setWrapStyleWord(false);
         output.setFont(OUTPUT_FONT);
         output.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+        translationOutput.setEditable(false);
+        translationOutput.setLineWrap(true);
+        translationOutput.setWrapStyleWord(true);
+        translationOutput.setFont(TRANSLATION_FONT);
+        translationOutput.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
 
         JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT));
         startButton.addActionListener(new ActionListener() {
@@ -125,12 +136,23 @@ final class MainWindow extends JFrame {
                 status.setText("文字已复制");
             }
         });
+        JButton copyTranslationButton = new JButton("复制翻译");
+        copyTranslationButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Toolkit.getDefaultToolkit().getSystemClipboard()
+                        .setContents(new StringSelection(translationOutput.getText()), null);
+                status.setText("翻译已复制");
+            }
+        });
         startButton.setFont(BUTTON_FONT);
         stopButton.setFont(BUTTON_FONT);
         copyButton.setFont(BUTTON_FONT);
+        copyTranslationButton.setFont(BUTTON_FONT);
         controls.add(startButton);
         controls.add(stopButton);
         controls.add(copyButton);
+        controls.add(copyTranslationButton);
 
         status.setForeground(new Color(45, 75, 120));
         status.setFont(LABEL_FONT);
@@ -140,7 +162,7 @@ final class MainWindow extends JFrame {
         bottom.add(status, BorderLayout.SOUTH);
 
         add(selection, BorderLayout.NORTH);
-        add(new JScrollPane(output), BorderLayout.CENTER);
+        add(centerPanel(), BorderLayout.CENTER);
         add(bottom, BorderLayout.SOUTH);
         getRootPane().setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
         addWindowListener(new WindowAdapter() {
@@ -151,8 +173,28 @@ final class MainWindow extends JFrame {
         });
         setAlwaysOnTop(true);
         pack();
+        setSize(Math.max(getWidth(), 760), Math.max(getHeight(), 620));
         setLocationByPlatform(true);
+        status.setText("文本库已加载: " + translations.size() + " 条 (" + translations.source() + ")");
         updateButtons();
+    }
+
+    private JSplitPane centerPanel() {
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
+                textPanel("识别文本", output), textPanel("翻译", translationOutput));
+        splitPane.setResizeWeight(0.5);
+        splitPane.setBorder(null);
+        return splitPane;
+    }
+
+    private JPanel textPanel(String title, JTextArea textArea) {
+        JLabel label = new JLabel(title);
+        label.setFont(LABEL_FONT);
+        label.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.add(label, BorderLayout.NORTH);
+        panel.add(new JScrollPane(textArea), BorderLayout.CENTER);
+        return panel;
     }
 
     private void startRecognition() {

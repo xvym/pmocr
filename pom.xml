@@ -23,6 +23,12 @@
                     <include>pokemon_gs_font_1bpp.bin</include>
                 </includes>
             </resource>
+            <resource>
+                <directory>.</directory>
+                <includes>
+                    <include>text_clean.xlsx</include>
+                </includes>
+            </resource>
         </resources>
         <plugins>
             <plugin>
