@@ -26,6 +26,7 @@
             <resource>
                 <directory>.</directory>
                 <includes>
+                    <include>text.xlsx</include>
                     <include>text_clean.xlsx</include>
                 </includes>
             </resource>

@@ -175,7 +175,9 @@ final class MainWindow extends JFrame {
         pack();
         setSize(Math.max(getWidth(), 760), Math.max(getHeight(), 620));
         setLocationByPlatform(true);
-        status.setText("文本库已加载: " + translations.size() + " 条 (" + translations.source() + ")");
+        status.setText("文本库已加载: " + translations.size() + " 条，模板 "
+                + translations.templateSize() + " 条，名词 " + translations.nounSize()
+                + " 条 (" + translations.source() + ")");
         updateButtons();
     }
 

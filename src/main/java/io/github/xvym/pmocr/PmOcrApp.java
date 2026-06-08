@@ -27,6 +27,10 @@ public final class PmOcrApp {
                 recognizeImage(new File(args[1]));
                 return;
             }
+            if ("--translate".equals(args[0]) && args.length > 1) {
+                translateText(joinArgs(args, 1));
+                return;
+            }
             if ("--help".equals(args[0]) || "-h".equals(args[0])) {
                 printHelp();
                 return;
@@ -61,6 +65,13 @@ public final class PmOcrApp {
         System.out.println(XlsxTranslationRepository.loadDefault().translate(result.getText()));
         System.out.printf("倍率=%.2f, 平均误差=%.2f, 未知格=%d%n",
                 result.getScale(), result.getAverageDistance(), result.getUnknownCharacters());
+    }
+
+    private static void translateText(String text) {
+        XlsxTranslationRepository translations = XlsxTranslationRepository.loadDefault();
+        System.out.println(translations.translate(text.replace("\\n", "\n")));
+        System.out.printf("文本库=%s, 条目=%d, 模板=%d, 名词=%d%n",
+                translations.source(), translations.size(), translations.templateSize(), translations.nounSize());
     }
 
     private static boolean verify(File directory) throws IOException {
@@ -132,10 +143,22 @@ public final class PmOcrApp {
         return dot < 0 ? name : name.substring(0, dot);
     }
 
+    private static String joinArgs(String[] args, int start) {
+        StringBuilder result = new StringBuilder();
+        for (int i = start; i < args.length; i++) {
+            if (result.length() > 0) {
+                result.append(' ');
+            }
+            result.append(args[i]);
+        }
+        return result.toString();
+    }
+
     private static void printHelp() {
         System.out.println("用法:");
         System.out.println("  java -jar target/pmocr-1.0.0.jar");
         System.out.println("  java -jar target/pmocr-1.0.0.jar --image testphoto/1.bmp");
         System.out.println("  java -jar target/pmocr-1.0.0.jar --verify testphoto");
+        System.out.println("  java -jar target/pmocr-1.0.0.jar --translate \"<PLAYER>は\\nきのみを　もらった！\"");
     }
 }

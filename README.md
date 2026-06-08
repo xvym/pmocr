@@ -56,6 +56,23 @@ java -jar target\pmocr-1.0.0.jar --verify testphoto
 
 Windows 旧版终端若显示日文乱码，可先执行 `chcp 65001`；这只影响终端显示，不影响识别结果和 GUI。
 
+## 翻译文本库
+
+程序启动时会把翻译文本库预加载到内存。查找顺序如下：
+
+1. 当前目录 `text.xlsx`
+2. `D:\Code\Workspace\PokeGSC_SharedXLSXCN\text.xlsx`
+3. 当前目录 `text_clean.xlsx`
+4. JAR 内置的 `text.xlsx` / `text_clean.xlsx`
+
+新版 `text.xlsx` 会读取 `文1` 到 `文10` 的对话文本、`图` 的图鉴文本，以及其他名词 sheet。固定文本进入 `HashMap`，识别后为 O(1) 查找；含 `<PLAYER>`、`<RIVAL>`、`【0】` 等占位符的文本会在启动时预编译为模板，固定文本未命中时再进行模板匹配。模板捕获到的动态值会先查宝可梦、道具、招式、地点等名词表，能翻译则替换为中文，查不到则保留原文。
+
+命令行可直接测试翻译：
+
+```powershell
+java -jar target\pmocr-1.0.0.jar --translate "ゴールドは　ウツギはかせ　から\nマスターボールを　もらった！"
+```
+
 ## 实现方式
 
 实时处理流程：
