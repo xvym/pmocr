@@ -23,10 +23,18 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.function.Consumer;
 
+/**
+ * @Author: Xv
+ * @Date: 2026/6/9
+ * @Description: 全屏半透明区域选择器，用于让用户圈选模拟器画面。
+ */
 final class RegionSelector {
     private RegionSelector() {
     }
 
+    /**
+     * 打开覆盖所有显示器的选择窗口，拖拽完成后返回屏幕绝对坐标区域。
+     */
     static void select(JFrame owner, Consumer<Rectangle> callback) {
         Rectangle virtualBounds = virtualScreenBounds();
         final JWindow window = new JWindow(owner);
@@ -48,6 +56,9 @@ final class RegionSelector {
         window.requestFocus();
     }
 
+    /**
+     * 计算多显示器环境下的虚拟桌面边界。
+     */
     private static Rectangle virtualScreenBounds() {
         Rectangle result = new Rectangle();
         for (GraphicsDevice device : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
@@ -56,6 +67,9 @@ final class RegionSelector {
         return result;
     }
 
+    /**
+     * 实际绘制遮罩和处理鼠标拖拽的选择面板。
+     */
     private static final class SelectionPanel extends JPanel {
         private final Rectangle virtualBounds;
         private final JWindow window;
@@ -63,6 +77,9 @@ final class RegionSelector {
         private Point start;
         private Point end;
 
+        /**
+         * 绑定鼠标事件；释放鼠标时将面板内坐标转换为屏幕绝对坐标。
+         */
         SelectionPanel(Rectangle virtualBounds, JWindow window, Consumer<Rectangle> callback) {
             this.virtualBounds = virtualBounds;
             this.window = window;
@@ -99,11 +116,17 @@ final class RegionSelector {
             addMouseMotionListener(mouse);
         }
 
+        /**
+         * 让窗口尺寸覆盖完整虚拟桌面。
+         */
         @Override
         public Dimension getPreferredSize() {
             return virtualBounds.getSize();
         }
 
+        /**
+         * 绘制暗色遮罩、当前选区和尺寸提示。
+         */
         @Override
         protected void paintComponent(Graphics graphics) {
             Graphics2D g = (Graphics2D) graphics.create();
@@ -128,6 +151,9 @@ final class RegionSelector {
             g.dispose();
         }
 
+        /**
+         * 将拖拽起点和终点规范化为左上角 + 宽高形式。
+         */
         private Rectangle selection() {
             int x = Math.min(start.x, end.x);
             int y = Math.min(start.y, end.y);

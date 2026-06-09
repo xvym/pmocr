@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.github.pmocr</groupId>
+    <groupId>io.github.xvym</groupId>
     <artifactId>pmocr</artifactId>
     <version>1.0.0</version>
     <name>Pokemon Gold Silver OCR</name>
@@ -16,32 +16,27 @@
     </properties>
 
     <build>
-        <resources>
-            <resource>
-                <directory>matrix</directory>
-                <includes>
-                    <include>pokemon_gs_font_1bpp.bin</include>
-                </includes>
-            </resource>
-            <resource>
-                <directory>.</directory>
-                <includes>
-                    <include>text.xlsx</include>
-                    <include>text_clean.xlsx</include>
-                </includes>
-            </resource>
-        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>io.github.xvym.pmocr.PmOcrApp</mainClass>
-                        </manifest>
-                    </archive>
-                </configuration>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.4.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>io.github.xvym.pmocr.PmOcrApp</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

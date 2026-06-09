@@ -4,7 +4,7 @@
 
 ## 为什么使用 matrix
 
-运行时使用 `matrix/pokemon_gs_font_1bpp.bin`，不使用 `font` 下的截图：
+运行时使用 `src/main/resources/matrix/pokemon_gs_font_1bpp.bin`，不使用 `src/main/resources/font` 下的截图：
 
 - 游戏文字本身是固定的 `8x8` 点阵，矩阵可以直接做汉明距离匹配，速度快且结果可解释。
 - `matrix` 没有边框、相邻文字粘连和截图缩放污染；`font` 图片需要额外清洗，反而会降低准确率。
@@ -28,6 +28,16 @@ mvn clean package
 java -jar target\pmocr-1.0.0.jar
 ```
 
+项目使用 `maven-shade-plugin` 在 `package` 阶段生成可执行 JAR；以后如果加入第三方依赖，会一并打进 `target/pmocr-1.0.0.jar`。shade 插件同时会保留一个未合并依赖前的 `target/original-pmocr-1.0.0.jar`。
+
+资源目录采用 Maven 默认结构：
+
+- `src/main/resources/matrix`：运行时 OCR 字体矩阵。
+- `src/main/resources/font`：字体截图资料，当前不参与运行时识别。
+- `src/main/resources/text_clean.xlsx`：内置备用翻译文本库。
+- `src/test/resources/testpic`：离线回归截图和标注。
+- `src/test/resources/badcase`：问题样本截图。
+
 操作步骤：
 
 1. 启动模拟器并进入游戏。
@@ -43,16 +53,16 @@ java -jar target\pmocr-1.0.0.jar
 识别单张截图：
 
 ```powershell
-java -jar target\pmocr-1.0.0.jar --image testphoto\1.bmp
+java -jar target\pmocr-1.0.0.jar --image src\test\resources\testpic\1.bmp
 ```
 
 使用同名 `.txt` 标注批量验证：
 
 ```powershell
-java -jar target\pmocr-1.0.0.jar --verify testphoto
+java -jar target\pmocr-1.0.0.jar --verify src\test\resources\testpic
 ```
 
-当前 `testphoto` 中四张原始截图全部逐字匹配，模板平均汉明距离均为 `0.00`。额外测试的对话框裁剪图、`2x`、`3x`、`2.5x` 双线性和高质量双三次缩放图也全部匹配。
+当前 `src/test/resources/testpic` 中四张原始截图全部逐字匹配，模板平均汉明距离均为 `0.00`。额外测试的对话框裁剪图、`2x`、`3x`、`2.5x` 双线性和高质量双三次缩放图也全部匹配。
 
 Windows 旧版终端若显示日文乱码，可先执行 `chcp 65001`；这只影响终端显示，不影响识别结果和 GUI。
 

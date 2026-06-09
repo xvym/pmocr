@@ -22,6 +22,11 @@ import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
+/**
+ * @Author: Xv
+ * @Date: 2026/6/9
+ * @Description: Swing 主界面，负责区域选择、实时识别控制以及日文/翻译文本展示。
+ */
 final class MainWindow extends JFrame {
     private static final Font BUTTON_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 18);
     private static final Font LABEL_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, 16);
@@ -38,6 +43,9 @@ final class MainWindow extends JFrame {
     private final RealtimeRecognizer recognizer;
     private Rectangle captureArea;
 
+    /**
+     * 初始化翻译库和实时识别器，识别结果通过 Swing 事件线程回写到界面。
+     */
     MainWindow() {
         super("宝可梦 金/银 日文像素文字 OCR @自信过剩");
         translations = XlsxTranslationRepository.loadDefault();
@@ -66,6 +74,9 @@ final class MainWindow extends JFrame {
         initialize();
     }
 
+    /**
+     * 组装窗口控件、按钮事件和关闭事件。
+     */
     private void initialize() {
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout(8, 8));
@@ -181,6 +192,9 @@ final class MainWindow extends JFrame {
         updateButtons();
     }
 
+    /**
+     * 构建上下分屏的识别文本区和翻译文本区。
+     */
     private JSplitPane centerPanel() {
         JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
                 textPanel("识别文本", output), textPanel("翻译", translationOutput));
@@ -189,6 +203,9 @@ final class MainWindow extends JFrame {
         return splitPane;
     }
 
+    /**
+     * 创建带标题的文本显示面板。
+     */
     private JPanel textPanel(String title, JTextArea textArea) {
         JLabel label = new JLabel(title);
         label.setFont(LABEL_FONT);
@@ -199,6 +216,9 @@ final class MainWindow extends JFrame {
         return panel;
     }
 
+    /**
+     * 根据用户圈选区域启动实时截图识别。
+     */
     private void startRecognition() {
         if (captureArea == null) {
             status.setText("请先圈选游戏区域");
@@ -213,6 +233,9 @@ final class MainWindow extends JFrame {
         updateButtons();
     }
 
+    /**
+     * 根据当前状态刷新开始/停止按钮可用性。
+     */
     private void updateButtons() {
         startButton.setEnabled(captureArea != null && !recognizer.isRunning());
         stopButton.setEnabled(recognizer.isRunning());

@@ -9,7 +9,15 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * @Author: Xv
+ * @Date: 2026/6/9
+ * @Description: 后台实时截图识别循环，负责稳定性检测和识别结果回调。
+ */
 final class RealtimeRecognizer {
+    /**
+     * 实时识别事件监听器，UI 层通过它接收状态和识别文本。
+     */
     interface Listener {
         void onStatus(String status);
 
@@ -27,6 +35,11 @@ final class RealtimeRecognizer {
         this.listener = listener;
     }
 
+    /**
+     * 启动固定频率截图任务；文字区域稳定后才触发完整 OCR。
+     *
+     * @param captureArea 用户圈选的屏幕区域
+     */
     synchronized void start(final Rectangle captureArea) throws AWTException {
         stop();
         final Robot robot = new Robot();
@@ -68,6 +81,9 @@ final class RealtimeRecognizer {
         }, 0L, 80L, TimeUnit.MILLISECONDS);
     }
 
+    /**
+     * 停止后台截图任务并清空稳定性状态。
+     */
     synchronized void stop() {
         if (executor != null) {
             executor.shutdownNow();
@@ -76,10 +92,16 @@ final class RealtimeRecognizer {
         stability.reset();
     }
 
+    /**
+     * 判断实时识别线程是否仍在运行。
+     */
     synchronized boolean isRunning() {
         return executor != null && !executor.isShutdown();
     }
 
+    /**
+     * 只在状态文字发生变化时通知监听器，减少 UI 重复刷新。
+     */
     private void status(String value) {
         if (!value.equals(previousStatus)) {
             previousStatus = value;

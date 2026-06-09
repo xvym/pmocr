@@ -6,6 +6,11 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * @Author: Xv
+ * @Date: 2026/6/9
+ * @Description: 宝可梦金银对话框 OCR 核心，负责文本框定位、像素采样和模板匹配。
+ */
 public final class PokemonOcr {
     private static final int COLUMNS = 18;
     private static final int LINES = 2;
@@ -14,6 +19,10 @@ public final class PokemonOcr {
 
     private final FontTemplates templates = new FontTemplates();
 
+    /**
+     * 轻量探测当前截图是否包含对话框，并生成文字区域指纹。
+     * 实时识别循环使用该方法判断文字是否已经停止变化。
+     */
     public Probe probe(BufferedImage image) {
         TextBox box = detectTextBox(image);
         if (box == null) {
@@ -23,6 +32,9 @@ public final class PokemonOcr {
         return new Probe(true, fingerprint(image, box, threshold), box.scale);
     }
 
+    /**
+     * 对截图执行完整 OCR，返回识别文本、文本框位置、缩放比例和匹配质量信息。
+     */
     public Recognition recognize(BufferedImage image) {
         TextBox box = detectTextBox(image);
         if (box == null) {
@@ -71,6 +83,9 @@ public final class PokemonOcr {
                 fingerprint(image, box, threshold));
     }
 
+    /**
+     * 通过扫描对话框上下两条深色横线来定位标准双行文本框。
+     */
     private TextBox detectTextBox(BufferedImage image) {
         List<DarkRun> runs = new ArrayList<DarkRun>();
         int minimumLength = Math.max(45, image.getWidth() / 3);
@@ -128,6 +143,9 @@ public final class PokemonOcr {
         return best;
     }
 
+    /**
+     * 找出指定横向扫描线上的最长暗色连续区间。
+     */
     private static DarkRun longestDarkRun(BufferedImage image, int y, int threshold) {
         int bestStart = 0;
         int bestEnd = -1;
@@ -149,6 +167,9 @@ public final class PokemonOcr {
         return new DarkRun(y, bestStart, bestEnd);
     }
 
+    /**
+     * 基于文字区域的亮度范围动态计算二值化阈值。
+     */
     private static int calculateThreshold(BufferedImage image, TextBox box) {
         int min = 255;
         int max = 0;
@@ -166,6 +187,9 @@ public final class PokemonOcr {
         return clamp((min + max) / 2, 70, 210);
     }
 
+    /**
+     * 按 GameBoy 字符网格采样指定行数，并将每行压缩为一个字节。
+     */
     private static byte[] sampleRows(BufferedImage image, double x, double y, double scale, int rows,
                                      int threshold) {
         byte[] result = new byte[rows];
@@ -183,6 +207,9 @@ public final class PokemonOcr {
         return result;
     }
 
+    /**
+     * 检测字符上方的浊点或半浊点。
+     */
     private char detectMark(byte[] rows) {
         if (isBlank(rows)) {
             return 0;
@@ -196,6 +223,9 @@ public final class PokemonOcr {
         return dakuten <= handakuten ? '゛' : '゜';
     }
 
+    /**
+     * 将基础假名和浊点/半浊点组合为 NFC 规范化后的日文字符。
+     */
     private static char compose(char base, char mark) {
         if (mark == 0) {
             return base;
@@ -205,10 +235,16 @@ public final class PokemonOcr {
         return normalized.length() == 1 ? normalized.charAt(0) : base;
     }
 
+    /**
+     * 将模板内部字符转换为最终展示字符。
+     */
     private static char displayCharacter(char value) {
         return value == '!' ? '！' : value;
     }
 
+    /**
+     * 将一行字符格渲染为文本，保留中间空格并去掉行尾空白。
+     */
     private static String renderLine(Cell[] cells) {
         int lastKnown = -1;
         for (int i = 0; i < cells.length; i++) {
@@ -232,6 +268,9 @@ public final class PokemonOcr {
         return line.toString();
     }
 
+    /**
+     * 修正游戏中平假名和片假名共用同一像素字形的歧义。
+     */
     private static String resolveSharedGlyphs(String line) {
         char[] characters = line.toCharArray();
         for (int i = 0; i < characters.length; i++) {
@@ -249,6 +288,9 @@ public final class PokemonOcr {
         return new String(characters);
     }
 
+    /**
+     * 从当前位置向指定方向寻找最近的有效上下文字符。
+     */
     private static char nearestNonSpace(char[] characters, int start, int direction) {
         for (int i = start + direction; i >= 0 && i < characters.length; i += direction) {
             if (!Character.isWhitespace(characters[i]) && characters[i] != '�') {
@@ -258,14 +300,23 @@ public final class PokemonOcr {
         return 0;
     }
 
+    /**
+     * 判断字符是否处于平假名 Unicode 区间。
+     */
     private static boolean isHiragana(char value) {
         return value >= '\u3040' && value <= '\u309f';
     }
 
+    /**
+     * 判断字符是否处于片假名 Unicode 区间。
+     */
     private static boolean isKatakana(char value) {
         return value >= '\u30a0' && value <= '\u30ff';
     }
 
+    /**
+     * 对两行文字区的主体和标记采样结果生成稳定性指纹。
+     */
     private static long fingerprint(BufferedImage image, TextBox box, int threshold) {
         long hash = 0xcbf29ce484222325L;
         for (int line = 0; line < LINES; line++) {
@@ -285,6 +336,9 @@ public final class PokemonOcr {
         return hash;
     }
 
+    /**
+     * 判断采样矩阵是否没有任何暗色像素。
+     */
     private static boolean isBlank(byte[] rows) {
         for (byte row : rows) {
             if (row != 0) {
@@ -294,6 +348,9 @@ public final class PokemonOcr {
         return true;
     }
 
+    /**
+     * 使用整数加权公式将 RGB 转换为亮度。
+     */
     private static int luminance(int rgb) {
         int red = (rgb >>> 16) & 0xff;
         int green = (rgb >>> 8) & 0xff;
@@ -301,10 +358,16 @@ public final class PokemonOcr {
         return (red * 299 + green * 587 + blue * 114) / 1000;
     }
 
+    /**
+     * 将数值限制在指定闭区间内。
+     */
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }
 
+    /**
+     * 使用换行符拼接多行识别结果。
+     */
     private static String join(List<String> lines) {
         StringBuilder result = new StringBuilder();
         for (String line : lines) {
@@ -316,6 +379,9 @@ public final class PokemonOcr {
         return result.toString();
     }
 
+    /**
+     * 完整 OCR 结果。
+     */
     public static final class Recognition {
         private final boolean textBoxFound;
         private final String text;
@@ -369,6 +435,9 @@ public final class PokemonOcr {
         }
     }
 
+    /**
+     * 稳定性探测结果。
+     */
     public static final class Probe {
         private final boolean textBoxFound;
         private final long fingerprint;
@@ -397,6 +466,9 @@ public final class PokemonOcr {
         }
     }
 
+    /**
+     * 已定位的对话框和文字网格起点。
+     */
     private static final class TextBox {
         final Rectangle bounds;
         final double scale;
@@ -410,6 +482,9 @@ public final class PokemonOcr {
             this.firstLineY = firstLineY;
         }
 
+        /**
+         * 判断推算出的文字采样区域是否仍落在截图范围内。
+         */
         boolean hasRoom(BufferedImage image) {
             return textX >= 0 && firstLineY - 3.0 * scale >= 0
                     && textX + COLUMNS * 8.0 * scale <= image.getWidth() + scale
@@ -417,6 +492,9 @@ public final class PokemonOcr {
         }
     }
 
+    /**
+     * 横向暗色线段，用于描述候选边框。
+     */
     private static final class DarkRun {
         final int y;
         final int start;
@@ -437,10 +515,16 @@ public final class PokemonOcr {
         }
     }
 
+    /**
+     * 单个字符格的识别状态。
+     */
     private enum CellType {
         CHARACTER, SPACE, UNKNOWN
     }
 
+    /**
+     * 单个字符格的中间结果。
+     */
     private static final class Cell {
         final CellType type;
         final char value;

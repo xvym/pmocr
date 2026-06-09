@@ -32,6 +32,11 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+/**
+ * @Author: Xv
+ * @Date: 2026/6/9
+ * @Description: 从 XLSX 文本库加载日文对话和中文翻译，并支持固定文本与占位符模板匹配。
+ */
 final class XlsxTranslationRepository {
     private static final String NOT_FOUND = "无文本";
     private static final String MODERN_TEXT_FILE = "text.xlsx";
@@ -47,6 +52,9 @@ final class XlsxTranslationRepository {
         this.source = source;
     }
 
+    /**
+     * 按优先级加载外部文本库或 JAR 内置文本库。
+     */
     static XlsxTranslationRepository loadDefault() {
         String[] files = {MODERN_TEXT_FILE, USER_TEXT_FILE, LEGACY_TEXT_FILE};
         for (String name : files) {
@@ -74,6 +82,9 @@ final class XlsxTranslationRepository {
         return empty("未找到文本库");
     }
 
+    /**
+     * 翻译 OCR 得到的日文文本。优先整体匹配，失败后按行拆分匹配。
+     */
     String translate(String japaneseText) {
         String normalized = normalizeText(japaneseText);
         if (normalized.isEmpty()) {
@@ -123,6 +134,9 @@ final class XlsxTranslationRepository {
         return new XlsxTranslationRepository(new TranslationStore(), source);
     }
 
+    /**
+     * 读取 XLSX 并根据表结构选择新版或旧版解析逻辑。
+     */
     private static XlsxTranslationRepository load(InputStream input, String source) throws IOException {
         Workbook workbook = readWorkbook(input);
         List<String> sharedStrings = parseSharedStrings(workbook.entry("xl/sharedStrings.xml"));
@@ -136,11 +150,17 @@ final class XlsxTranslationRepository {
         return new XlsxTranslationRepository(store, source);
     }
 
+    /**
+     * 解析旧版 text_clean.xlsx 中的固定对话文本表。
+     */
     private static void parseLegacyWorkbook(Workbook workbook, List<String> sharedStrings,
                                             TranslationStore store) throws IOException {
         parseSimpleTextSheet(workbook.entry(workbook.sheetPath("对话文本")), sharedStrings, store, "A", "B");
     }
 
+    /**
+     * 解析新版 text.xlsx：先加载名词表，再加载对话和图鉴文本。
+     */
     private static void parseModernWorkbook(Workbook workbook, List<String> sharedStrings,
                                             TranslationStore store) throws IOException {
         for (String sheetName : workbook.sheetNames()) {
@@ -157,6 +177,9 @@ final class XlsxTranslationRepository {
         }
     }
 
+    /**
+     * 判断 sheet 是否应作为名词翻译表处理。
+     */
     private static boolean isNounSheet(String sheetName) {
         return !"图".equals(sheetName)
                 && !"标".equals(sheetName)
@@ -164,6 +187,9 @@ final class XlsxTranslationRepository {
                 && !sheetName.matches("文\\d+");
     }
 
+    /**
+     * 解析日文列和翻译列一一对应的简单文本表。
+     */
     private static void parseSimpleTextSheet(byte[] xml, List<String> sharedStrings, TranslationStore store,
                                              String japaneseColumn, String translationColumn) throws IOException {
         for (RowValues row : parseRows(xml, sharedStrings)) {
@@ -171,6 +197,9 @@ final class XlsxTranslationRepository {
         }
     }
 
+    /**
+     * 解析名词表，跳过标记为不使用的行。
+     */
     private static void parseNounSheet(byte[] xml, List<String> sharedStrings, TranslationStore store)
             throws IOException {
         for (RowValues row : parseRows(xml, sharedStrings)) {
@@ -181,6 +210,9 @@ final class XlsxTranslationRepository {
         }
     }
 
+    /**
+     * 解析对话 sheet，并按分段标记把连续行聚合成文本块。
+     */
     private static void parseDialogSheet(byte[] xml, List<String> sharedStrings, TranslationStore store)
             throws IOException {
         List<BlockLine> block = new ArrayList<BlockLine>();
@@ -195,6 +227,9 @@ final class XlsxTranslationRepository {
         flushBlock(block, store);
     }
 
+    /**
+     * 解析图鉴 sheet，兼容图鉴文本中的分页和空行分段。
+     */
     private static void parsePokedexSheet(byte[] xml, List<String> sharedStrings, TranslationStore store)
             throws IOException {
         List<BlockLine> block = new ArrayList<BlockLine>();
@@ -217,11 +252,17 @@ final class XlsxTranslationRepository {
         flushBlock(block, store);
     }
 
+    /**
+     * 判断当前行是否为对话分段头。
+     */
     private static boolean isDialogHeader(RowValues row) {
         return trim(row.value("A")).startsWith("|---英文")
                 || trim(row.value("C")).startsWith("|---日文");
     }
 
+    /**
+     * 将一个文本块写入翻译库，同时补充整段和相邻两行窗口的匹配项。
+     */
     private static void flushBlock(List<BlockLine> block, TranslationStore store) {
         if (block.isEmpty()) {
             return;
@@ -242,6 +283,9 @@ final class XlsxTranslationRepository {
         addTwoLineWindows(block, store);
     }
 
+    /**
+     * 为游戏中常见的双行对话窗口生成额外匹配项。
+     */
     private static void addTwoLineWindows(List<BlockLine> block, TranslationStore store) {
         List<Integer> japaneseIndexes = new ArrayList<Integer>();
         for (int i = 0; i < block.size(); i++) {
@@ -270,6 +314,9 @@ final class XlsxTranslationRepository {
         }
     }
 
+    /**
+     * 过滤空行、分隔标记和非实际游戏文本。
+     */
     private static boolean isUsefulText(String value) {
         String text = trim(value);
         return !text.isEmpty()
@@ -279,6 +326,9 @@ final class XlsxTranslationRepository {
                 && !text.startsWith("--开始");
     }
 
+    /**
+     * 将 XLSX 当作 zip 读取，只保留解析文本所需的 XML 条目。
+     */
     private static Workbook readWorkbook(InputStream input) throws IOException {
         Map<String, byte[]> entries = new HashMap<String, byte[]>();
         ZipInputStream zip = new ZipInputStream(input);
@@ -295,6 +345,9 @@ final class XlsxTranslationRepository {
         return new Workbook(entries);
     }
 
+    /**
+     * 判断 zip 条目是否需要读入内存。
+     */
     private static boolean shouldReadEntry(String name) {
         return "xl/workbook.xml".equals(name)
                 || "xl/_rels/workbook.xml.rels".equals(name)
@@ -302,6 +355,9 @@ final class XlsxTranslationRepository {
                 || name.startsWith("xl/worksheets/sheet");
     }
 
+    /**
+     * 解析 XLSX sharedStrings.xml，得到共享字符串表。
+     */
     private static List<String> parseSharedStrings(byte[] xml) throws IOException {
         List<String> result = new ArrayList<String>();
         if (xml == null) {
@@ -321,6 +377,9 @@ final class XlsxTranslationRepository {
         return result;
     }
 
+    /**
+     * 解析 worksheet XML，并按列名保存每行单元格文本。
+     */
     private static List<RowValues> parseRows(byte[] xml, List<String> sharedStrings) throws IOException {
         List<RowValues> result = new ArrayList<RowValues>();
         if (xml == null) {
@@ -341,6 +400,9 @@ final class XlsxTranslationRepository {
         return result;
     }
 
+    /**
+     * 读取单元格文本，兼容 shared string、inline string 和普通值。
+     */
     private static String cellValue(Element cell, List<String> sharedStrings) {
         String type = cell.getAttribute("t");
         if ("inlineStr".equals(type)) {
@@ -364,6 +426,9 @@ final class XlsxTranslationRepository {
         return raw;
     }
 
+    /**
+     * 从 A1、BC23 这样的单元格引用中提取列名。
+     */
     private static String columnName(String reference) {
         StringBuilder column = new StringBuilder();
         for (int i = 0; i < reference.length(); i++) {
@@ -377,6 +442,9 @@ final class XlsxTranslationRepository {
         return column.toString();
     }
 
+    /**
+     * 安全解析 XML，禁用外部实体避免 XXE 风险。
+     */
     private static Document parseXml(byte[] xml) throws IOException {
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -391,6 +459,9 @@ final class XlsxTranslationRepository {
         }
     }
 
+    /**
+     * 尽可能关闭 XML 外部实体和 DTD 加载。
+     */
     private static void disableExternalEntities(DocumentBuilderFactory factory) {
         trySetFeature(factory, "http://apache.org/xml/features/disallow-doctype-decl", true);
         trySetFeature(factory, "http://xml.org/sax/features/external-general-entities", false);
@@ -399,6 +470,9 @@ final class XlsxTranslationRepository {
         factory.setExpandEntityReferences(false);
     }
 
+    /**
+     * 某些 Java 8 XML 实现不支持全部安全特性，因此这里按 best effort 设置。
+     */
     private static void trySetFeature(DocumentBuilderFactory factory, String feature, boolean value) {
         try {
             factory.setFeature(feature, value);
@@ -407,6 +481,9 @@ final class XlsxTranslationRepository {
         }
     }
 
+    /**
+     * 读取输入流全部字节。
+     */
     private static byte[] readAll(InputStream input) throws IOException {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         byte[] buffer = new byte[8192];
@@ -417,6 +494,9 @@ final class XlsxTranslationRepository {
         return output.toByteArray();
     }
 
+    /**
+     * 安静关闭资源，用于 zip 流清理路径。
+     */
     private static void closeQuietly(Closeable closeable) {
         try {
             closeable.close();
@@ -424,6 +504,9 @@ final class XlsxTranslationRepository {
         }
     }
 
+    /**
+     * 统一文本键格式：NFC、换行规范化、全角空格转半角并裁剪行首尾。
+     */
     private static String normalizeText(String value) {
         if (value == null) {
             return "";
@@ -443,10 +526,16 @@ final class XlsxTranslationRepository {
         return trim(result.toString());
     }
 
+    /**
+     * 标准精确匹配 key。
+     */
     private static String normalizeKey(String value) {
         return normalizeText(value);
     }
 
+    /**
+     * 去掉所有空白后的紧凑 key，用于容错匹配游戏换行和空格差异。
+     */
     private static String compactKey(String value) {
         String normalized = normalizeText(value);
         StringBuilder result = new StringBuilder();
@@ -459,6 +548,9 @@ final class XlsxTranslationRepository {
         return result.toString();
     }
 
+    /**
+     * 拼接多行文本并跳过空行。
+     */
     private static String join(Collection<String> values) {
         StringBuilder result = new StringBuilder();
         for (String value : values) {
@@ -474,10 +566,16 @@ final class XlsxTranslationRepository {
         return result.toString();
     }
 
+    /**
+     * 语义别名，表示输入会先标准化再拼接。
+     */
     private static String joinNormalized(Collection<String> values) {
         return join(values);
     }
 
+    /**
+     * 去掉字符串首尾空白；null 按空字符串处理。
+     */
     private static String trim(String value) {
         if (value == null) {
             return "";
@@ -493,14 +591,23 @@ final class XlsxTranslationRepository {
         return value.substring(start, end);
     }
 
+    /**
+     * 返回第一个非空文本，常用于新版表中翻译列的兜底选择。
+     */
     private static String firstNonEmpty(String first, String second) {
         return trim(first).isEmpty() ? second : first;
     }
 
+    /**
+     * 判断文本是否包含 <...> 或【...】形式的占位符。
+     */
     private static boolean hasPlaceholder(String text) {
         return PLACEHOLDER.matcher(text).find();
     }
 
+    /**
+     * 翻译数据索引，包含 O(1) 精确匹配、名词表和预编译模板。
+     */
     private static final class TranslationStore {
         private final Map<String, String> exact = new HashMap<String, String>();
         private final Map<String, String> nouns = new HashMap<String, String>();
@@ -508,6 +615,9 @@ final class XlsxTranslationRepository {
         private final List<TemplateEntry> wildcardTemplates = new ArrayList<TemplateEntry>();
         private final Set<String> templateKeys = new HashSet<String>();
 
+        /**
+         * 添加普通对话翻译；含占位符文本会编译为模板。
+         */
         void addEntry(String japanese, String translation) {
             String source = normalizeText(japanese);
             String translated = normalizeText(translation);
@@ -523,6 +633,9 @@ final class XlsxTranslationRepository {
             }
         }
 
+        /**
+         * 添加名词翻译，用于替换模板捕获到的动态值。
+         */
         void addNoun(String japanese, String translation) {
             String source = normalizeText(japanese);
             String translated = normalizeText(translation);
@@ -534,6 +647,9 @@ final class XlsxTranslationRepository {
             putIfAbsent(nouns, compactKey(source), translated);
         }
 
+        /**
+         * 先查精确 key，再按首字符分桶查模板，最后查通配模板。
+         */
         String translate(String japaneseText) {
             String normalized = normalizeText(japaneseText);
             String direct = exact.get(normalizeKey(normalized));
@@ -570,6 +686,9 @@ final class XlsxTranslationRepository {
             return size;
         }
 
+        /**
+         * 按固定文本长度排序模板，让更具体的模板优先匹配。
+         */
         void prepare() {
             Comparator<TemplateEntry> comparator = new Comparator<TemplateEntry>() {
                 @Override
@@ -587,6 +706,9 @@ final class XlsxTranslationRepository {
             }
         }
 
+        /**
+         * 编译并保存一个占位符模板。
+         */
         private void addTemplate(String japanese, String translation) {
             String key = japanese + "\u0000" + translation;
             if (!templateKeys.add(key)) {
@@ -605,6 +727,9 @@ final class XlsxTranslationRepository {
             }
         }
 
+        /**
+         * 依次尝试候选模板，返回第一个成功翻译结果。
+         */
         private String matchTemplates(List<TemplateEntry> entries, String japaneseText) {
             if (entries == null) {
                 return null;
@@ -618,6 +743,9 @@ final class XlsxTranslationRepository {
             return null;
         }
 
+        /**
+         * 翻译模板捕获到的动态名词；名词表未命中则保留原文。
+         */
         private String translateCapturedValue(String value) {
             String translated = nouns.get(normalizeKey(value));
             if (translated != null) {
@@ -627,6 +755,9 @@ final class XlsxTranslationRepository {
             return translated == null ? normalizeText(value) : translated;
         }
 
+        /**
+         * 获取第一个非空白字符，用作模板分桶 key。
+         */
         private static char firstNonWhitespace(String value) {
             for (int i = 0; i < value.length(); i++) {
                 char character = value.charAt(i);
@@ -638,6 +769,9 @@ final class XlsxTranslationRepository {
         }
     }
 
+    /**
+     * 预编译的占位符翻译模板。
+     */
     private static final class TemplateEntry {
         final Pattern pattern;
         final String translationTemplate;
@@ -661,6 +795,9 @@ final class XlsxTranslationRepository {
             this.translationFixedLength = translationFixedLength;
         }
 
+        /**
+         * 将含占位符的日文模板编译为正则表达式。
+         */
         static TemplateEntry compile(String japaneseTemplate, String translationTemplate,
                                      TranslationStore store) {
             String normalized = normalizeText(japaneseTemplate);
@@ -698,6 +835,9 @@ final class XlsxTranslationRepository {
                     fixedTextLength(translationTemplate));
         }
 
+        /**
+         * 尝试匹配日文文本，并把捕获到的占位符值回填到中文模板。
+         */
         String tryTranslate(String japaneseText) {
             Matcher matcher = pattern.matcher(normalizeText(japaneseText));
             if (!matcher.matches()) {
@@ -722,6 +862,9 @@ final class XlsxTranslationRepository {
             return result.toString();
         }
 
+        /**
+         * 获取模板开头的第一个字面量字符。
+         */
         private static char firstLiteral(String value) {
             for (int i = 0; i < value.length(); i++) {
                 char character = value.charAt(i);
@@ -732,6 +875,9 @@ final class XlsxTranslationRepository {
             return 0;
         }
 
+        /**
+         * 将模板字面量加入正则，空白位置按宽松规则匹配。
+         */
         private static void appendFlexibleLiteral(StringBuilder regex, String literal) {
             StringBuilder plain = new StringBuilder();
             for (int i = 0; i < literal.length(); i++) {
@@ -750,6 +896,9 @@ final class XlsxTranslationRepository {
             appendQuoted(regex, plain);
         }
 
+        /**
+         * 将累积的普通文本按字面量追加到正则中。
+         */
         private static void appendQuoted(StringBuilder regex, StringBuilder plain) {
             if (plain.length() > 0) {
                 regex.append(Pattern.quote(plain.toString()));
@@ -757,6 +906,9 @@ final class XlsxTranslationRepository {
             }
         }
 
+        /**
+         * 统计翻译模板中的固定文本长度，用于模板优先级排序。
+         */
         private static int fixedTextLength(String template) {
             String normalized = normalizeText(template);
             Matcher matcher = PLACEHOLDER.matcher(normalized);
@@ -765,6 +917,9 @@ final class XlsxTranslationRepository {
         }
     }
 
+    /**
+     * 一个文本块中的日文/翻译行。
+     */
     private static final class BlockLine {
         final String japanese;
         final String translation;
@@ -775,6 +930,9 @@ final class XlsxTranslationRepository {
         }
     }
 
+    /**
+     * worksheet 中一行按列名索引后的值。
+     */
     private static final class RowValues {
         private final Map<String, String> values = new HashMap<String, String>();
 
@@ -788,6 +946,9 @@ final class XlsxTranslationRepository {
         }
     }
 
+    /**
+     * XLSX 工作簿的轻量视图，负责 sheet 名称和 XML 路径映射。
+     */
     private static final class Workbook {
         private final Map<String, byte[]> entries;
         private final Map<String, String> sheets;
@@ -813,6 +974,9 @@ final class XlsxTranslationRepository {
             return sheets.get(sheetName);
         }
 
+        /**
+         * 解析 workbook 关系文件，得到关系 id 到目标路径的映射。
+         */
         private static Map<String, String> parseRelationships(byte[] xml) throws IOException {
             Map<String, String> result = new HashMap<String, String>();
             Document document = parseXml(xml);
@@ -824,6 +988,9 @@ final class XlsxTranslationRepository {
             return result;
         }
 
+        /**
+         * 解析 sheet 名称，并通过关系映射得到实际 worksheet XML 路径。
+         */
         private static Map<String, String> parseSheets(byte[] xml, Map<String, String> relationships)
                 throws IOException {
             Map<String, String> result = new HashMap<String, String>();
@@ -847,6 +1014,9 @@ final class XlsxTranslationRepository {
         }
     }
 
+    /**
+     * 只在 key 非空且尚未存在时写入，避免后续重复行覆盖先前结果。
+     */
     private static void putIfAbsent(Map<String, String> result, String key, String value) {
         if (!key.isEmpty() && !result.containsKey(key)) {
             result.put(key, value);

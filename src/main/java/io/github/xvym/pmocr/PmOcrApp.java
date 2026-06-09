@@ -13,6 +13,11 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
+/**
+ * @Author: Xv
+ * @Date: 2026/6/9 21:34
+ * @Description: 宝可梦OCR翻译应用
+ */
 public final class PmOcrApp {
     private PmOcrApp() {
     }
@@ -20,7 +25,7 @@ public final class PmOcrApp {
     public static void main(String[] args) throws Exception {
         if (args.length > 0) {
             if ("--verify".equals(args[0])) {
-                File directory = new File(args.length > 1 ? args[1] : "testphoto");
+                File directory = new File(args.length > 1 ? args[1] : "src/test/resources/testpic");
                 System.exit(verify(directory) ? 0 : 1);
             }
             if ("--image".equals(args[0]) && args.length > 1) {
@@ -50,6 +55,9 @@ public final class PmOcrApp {
         });
     }
 
+    /**
+     * 识别单张图片，并同时输出翻译文本和匹配质量。
+     */
     private static void recognizeImage(File file) throws IOException {
         BufferedImage image = ImageIO.read(file);
         if (image == null) {
@@ -67,6 +75,9 @@ public final class PmOcrApp {
                 result.getScale(), result.getAverageDistance(), result.getUnknownCharacters());
     }
 
+    /**
+     * 仅执行文本翻译，便于在命令行调试文本库匹配效果。
+     */
     private static void translateText(String text) {
         XlsxTranslationRepository translations = XlsxTranslationRepository.loadDefault();
         System.out.println(translations.translate(text.replace("\\n", "\n")));
@@ -74,6 +85,9 @@ public final class PmOcrApp {
                 translations.source(), translations.size(), translations.templateSize(), translations.nounSize());
     }
 
+    /**
+     * 批量识别测试图片，并与同名 txt 标注文件比较。
+     */
     private static boolean verify(File directory) throws IOException {
         File[] images = directory.listFiles((dir, name) -> name.toLowerCase().endsWith(".bmp")
                 || name.toLowerCase().endsWith(".png"));
@@ -118,6 +132,9 @@ public final class PmOcrApp {
         return failures.isEmpty();
     }
 
+    /**
+     * 标准化测试文本，消除换行、全角空格和行尾空白差异。
+     */
     private static String normalize(String text) {
         String[] lines = text.replace("\r\n", "\n").replace('\r', '\n').replace('\u3000', ' ').split("\n", -1);
         StringBuilder result = new StringBuilder();
@@ -130,6 +147,9 @@ public final class PmOcrApp {
         return trimRight(result.toString());
     }
 
+    /**
+     * 去掉字符串右侧空白，保留左侧和中间空白。
+     */
     private static String trimRight(String value) {
         int end = value.length();
         while (end > 0 && Character.isWhitespace(value.charAt(end - 1))) {
@@ -138,11 +158,17 @@ public final class PmOcrApp {
         return value.substring(0, end);
     }
 
+    /**
+     * 去掉文件名扩展名，用于寻找同名 txt 标注文件。
+     */
     private static String stripExtension(String name) {
         int dot = name.lastIndexOf('.');
         return dot < 0 ? name : name.substring(0, dot);
     }
 
+    /**
+     * 将命令行剩余参数重新拼接成一个文本参数。
+     */
     private static String joinArgs(String[] args, int start) {
         StringBuilder result = new StringBuilder();
         for (int i = start; i < args.length; i++) {
@@ -154,11 +180,14 @@ public final class PmOcrApp {
         return result.toString();
     }
 
+    /**
+     * 打印命令行使用说明。
+     */
     private static void printHelp() {
         System.out.println("用法:");
         System.out.println("  java -jar target/pmocr-1.0.0.jar");
-        System.out.println("  java -jar target/pmocr-1.0.0.jar --image testphoto/1.bmp");
-        System.out.println("  java -jar target/pmocr-1.0.0.jar --verify testphoto");
+        System.out.println("  java -jar target/pmocr-1.0.0.jar --image src/test/resources/testpic/1.bmp");
+        System.out.println("  java -jar target/pmocr-1.0.0.jar --verify src/test/resources/testpic");
         System.out.println("  java -jar target/pmocr-1.0.0.jar --translate \"<PLAYER>は\\nきのみを　もらった！\"");
     }
 }
