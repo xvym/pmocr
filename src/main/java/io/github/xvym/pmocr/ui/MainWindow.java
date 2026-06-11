@@ -1,4 +1,8 @@
-package io.github.xvym.pmocr;
+package io.github.xvym.pmocr.ui;
+
+import io.github.xvym.pmocr.ocr.PokemonOcr;
+import io.github.xvym.pmocr.runtime.RealtimeRecognizer;
+import io.github.xvym.pmocr.translation.XlsxTranslationRepository;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -27,7 +31,7 @@ import java.awt.event.WindowEvent;
  * @Date: 2026/6/9
  * @Description: Swing 主界面，负责区域选择、实时识别控制以及日文/翻译文本展示。
  */
-final class MainWindow extends JFrame {
+public final class MainWindow extends JFrame {
     private static final Font BUTTON_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 18);
     private static final Font LABEL_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, 16);
     private static final Font OUTPUT_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, 28);
@@ -46,7 +50,7 @@ final class MainWindow extends JFrame {
     /**
      * 初始化翻译库和实时识别器，识别结果通过 Swing 事件线程回写到界面。
      */
-    MainWindow() {
+    public MainWindow() {
         super("宝可梦 金/银 日文像素文字 OCR @自信过剩");
         translations = XlsxTranslationRepository.loadDefault();
         recognizer = new RealtimeRecognizer(new PokemonOcr(), new RealtimeRecognizer.Listener() {

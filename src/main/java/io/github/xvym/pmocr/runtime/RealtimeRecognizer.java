@@ -1,4 +1,6 @@
-package io.github.xvym.pmocr;
+package io.github.xvym.pmocr.runtime;
+
+import io.github.xvym.pmocr.ocr.PokemonOcr;
 
 import java.awt.AWTException;
 import java.awt.Rectangle;
@@ -14,11 +16,11 @@ import java.util.concurrent.TimeUnit;
  * @Date: 2026/6/9
  * @Description: 后台实时截图识别循环，负责稳定性检测和识别结果回调。
  */
-final class RealtimeRecognizer {
+public final class RealtimeRecognizer {
     /**
      * 实时识别事件监听器，UI 层通过它接收状态和识别文本。
      */
-    interface Listener {
+    public interface Listener {
         void onStatus(String status);
 
         void onText(PokemonOcr.Recognition recognition);
@@ -30,7 +32,7 @@ final class RealtimeRecognizer {
     private ScheduledExecutorService executor;
     private String previousStatus = "";
 
-    RealtimeRecognizer(PokemonOcr ocr, Listener listener) {
+    public RealtimeRecognizer(PokemonOcr ocr, Listener listener) {
         this.ocr = ocr;
         this.listener = listener;
     }
@@ -40,7 +42,7 @@ final class RealtimeRecognizer {
      *
      * @param captureArea 用户圈选的屏幕区域
      */
-    synchronized void start(final Rectangle captureArea) throws AWTException {
+    public synchronized void start(final Rectangle captureArea) throws AWTException {
         stop();
         final Robot robot = new Robot();
         stability.reset();
@@ -84,7 +86,7 @@ final class RealtimeRecognizer {
     /**
      * 停止后台截图任务并清空稳定性状态。
      */
-    synchronized void stop() {
+    public synchronized void stop() {
         if (executor != null) {
             executor.shutdownNow();
             executor = null;
@@ -95,7 +97,7 @@ final class RealtimeRecognizer {
     /**
      * 判断实时识别线程是否仍在运行。
      */
-    synchronized boolean isRunning() {
+    public synchronized boolean isRunning() {
         return executor != null && !executor.isShutdown();
     }
 

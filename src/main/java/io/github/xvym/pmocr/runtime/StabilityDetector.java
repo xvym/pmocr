@@ -1,4 +1,4 @@
-package io.github.xvym.pmocr;
+package io.github.xvym.pmocr.runtime;
 
 /**
  * @Author: Xv

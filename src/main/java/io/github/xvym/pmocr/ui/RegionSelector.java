@@ -1,4 +1,4 @@
-package io.github.xvym.pmocr;
+package io.github.xvym.pmocr.ui;
 
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;

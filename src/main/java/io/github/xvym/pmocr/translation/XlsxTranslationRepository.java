@@ -1,4 +1,4 @@
-package io.github.xvym.pmocr;
+package io.github.xvym.pmocr.translation;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -9,26 +9,8 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.Closeable;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.text.Normalizer;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.io.*;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -37,38 +19,24 @@ import java.util.zip.ZipInputStream;
  * @Date: 2026/6/9
  * @Description: 从 XLSX 文本库加载日文对话和中文翻译，并支持固定文本与占位符模板匹配。
  */
-final class XlsxTranslationRepository {
+public final class XlsxTranslationRepository {
     private static final String NOT_FOUND = "无文本";
-    private static final String MODERN_TEXT_FILE = "text.xlsx";
-    private static final String LEGACY_TEXT_FILE = "text_clean.xlsx";
-    private static final String USER_TEXT_FILE = "D:\\Code\\Workspace\\PokeGSC_SharedXLSXCN\\text.xlsx";
-    private static final Pattern PLACEHOLDER = Pattern.compile("<[^>]+>|【[^】]+】");
-
-    private final TranslationStore store;
+    private static final String MODERN_TEXT_RESOURCE = "text/text.xlsx";
+    private static final String LEGACY_TEXT_RESOURCE = "text/text_clean.xlsx";
+    private final TranslationIndex store;
     private final String source;
 
-    private XlsxTranslationRepository(TranslationStore store, String source) {
+    private XlsxTranslationRepository(TranslationIndex store, String source) {
         this.store = store;
         this.source = source;
     }
 
     /**
-     * 按优先级加载外部文本库或 JAR 内置文本库。
+     * 加载文本库
      */
-    static XlsxTranslationRepository loadDefault() {
-        String[] files = {MODERN_TEXT_FILE, USER_TEXT_FILE, LEGACY_TEXT_FILE};
-        for (String name : files) {
-            File file = new File(name);
-            if (file.isFile()) {
-                try (InputStream input = new BufferedInputStream(new FileInputStream(file))) {
-                    return load(input, file.getPath());
-                } catch (IOException e) {
-                    return empty(file.getPath() + " 加载失败: " + e.getMessage());
-                }
-            }
-        }
+    public static XlsxTranslationRepository loadDefault() {
+        String[] resources = {MODERN_TEXT_RESOURCE, LEGACY_TEXT_RESOURCE};
 
-        String[] resources = {MODERN_TEXT_FILE, LEGACY_TEXT_FILE};
         for (String name : resources) {
             InputStream resource = XlsxTranslationRepository.class.getResourceAsStream("/" + name);
             if (resource != null) {
@@ -85,7 +53,7 @@ final class XlsxTranslationRepository {
     /**
      * 翻译 OCR 得到的日文文本。优先整体匹配，失败后按行拆分匹配。
      */
-    String translate(String japaneseText) {
+    public String translate(String japaneseText) {
         String normalized = normalizeText(japaneseText);
         if (normalized.isEmpty()) {
             return NOT_FOUND;
@@ -114,24 +82,29 @@ final class XlsxTranslationRepository {
         return hasLine ? result.toString() : NOT_FOUND;
     }
 
-    int size() {
+    public int size() {
         return store.exactSize() + store.templateSize();
     }
 
-    int nounSize() {
+    public int nounSize() {
         return store.nounSize();
     }
 
-    int templateSize() {
+    public int templateSize() {
         return store.templateSize();
     }
 
-    String source() {
+    public String source() {
         return source;
     }
 
     private static XlsxTranslationRepository empty(String source) {
-        return new XlsxTranslationRepository(new TranslationStore(), source);
+        return new XlsxTranslationRepository(new TranslationIndex(), source);
+    }
+
+    static XlsxTranslationRepository fromIndex(TranslationIndex store, String source) {
+        store.prepare();
+        return new XlsxTranslationRepository(store, source);
     }
 
     /**
@@ -140,7 +113,7 @@ final class XlsxTranslationRepository {
     private static XlsxTranslationRepository load(InputStream input, String source) throws IOException {
         Workbook workbook = readWorkbook(input);
         List<String> sharedStrings = parseSharedStrings(workbook.entry("xl/sharedStrings.xml"));
-        TranslationStore store = new TranslationStore();
+        TranslationIndex store = new TranslationIndex();
         if (workbook.hasSheet("对话文本")) {
             parseLegacyWorkbook(workbook, sharedStrings, store);
         } else {
@@ -154,7 +127,7 @@ final class XlsxTranslationRepository {
      * 解析旧版 text_clean.xlsx 中的固定对话文本表。
      */
     private static void parseLegacyWorkbook(Workbook workbook, List<String> sharedStrings,
-                                            TranslationStore store) throws IOException {
+                                            TranslationIndex store) throws IOException {
         parseSimpleTextSheet(workbook.entry(workbook.sheetPath("对话文本")), sharedStrings, store, "A", "B");
     }
 
@@ -162,7 +135,7 @@ final class XlsxTranslationRepository {
      * 解析新版 text.xlsx：先加载名词表，再加载对话和图鉴文本。
      */
     private static void parseModernWorkbook(Workbook workbook, List<String> sharedStrings,
-                                            TranslationStore store) throws IOException {
+                                            TranslationIndex store) throws IOException {
         for (String sheetName : workbook.sheetNames()) {
             if (isNounSheet(sheetName)) {
                 parseNounSheet(workbook.entry(workbook.sheetPath(sheetName)), sharedStrings, store);
@@ -190,7 +163,7 @@ final class XlsxTranslationRepository {
     /**
      * 解析日文列和翻译列一一对应的简单文本表。
      */
-    private static void parseSimpleTextSheet(byte[] xml, List<String> sharedStrings, TranslationStore store,
+    private static void parseSimpleTextSheet(byte[] xml, List<String> sharedStrings, TranslationIndex store,
                                              String japaneseColumn, String translationColumn) throws IOException {
         for (RowValues row : parseRows(xml, sharedStrings)) {
             store.addEntry(row.value(japaneseColumn), row.value(translationColumn));
@@ -200,7 +173,7 @@ final class XlsxTranslationRepository {
     /**
      * 解析名词表，跳过标记为不使用的行。
      */
-    private static void parseNounSheet(byte[] xml, List<String> sharedStrings, TranslationStore store)
+    private static void parseNounSheet(byte[] xml, List<String> sharedStrings, TranslationIndex store)
             throws IOException {
         for (RowValues row : parseRows(xml, sharedStrings)) {
             String skip = trim(row.value("F"));
@@ -213,7 +186,7 @@ final class XlsxTranslationRepository {
     /**
      * 解析对话 sheet，并按分段标记把连续行聚合成文本块。
      */
-    private static void parseDialogSheet(byte[] xml, List<String> sharedStrings, TranslationStore store)
+    private static void parseDialogSheet(byte[] xml, List<String> sharedStrings, TranslationIndex store)
             throws IOException {
         List<BlockLine> block = new ArrayList<BlockLine>();
         for (RowValues row : parseRows(xml, sharedStrings)) {
@@ -230,7 +203,7 @@ final class XlsxTranslationRepository {
     /**
      * 解析图鉴 sheet，兼容图鉴文本中的分页和空行分段。
      */
-    private static void parsePokedexSheet(byte[] xml, List<String> sharedStrings, TranslationStore store)
+    private static void parsePokedexSheet(byte[] xml, List<String> sharedStrings, TranslationIndex store)
             throws IOException {
         List<BlockLine> block = new ArrayList<BlockLine>();
         for (RowValues row : parseRows(xml, sharedStrings)) {
@@ -263,7 +236,7 @@ final class XlsxTranslationRepository {
     /**
      * 将一个文本块写入翻译库，同时补充整段和相邻两行窗口的匹配项。
      */
-    private static void flushBlock(List<BlockLine> block, TranslationStore store) {
+    private static void flushBlock(List<BlockLine> block, TranslationIndex store) {
         if (block.isEmpty()) {
             return;
         }
@@ -286,7 +259,7 @@ final class XlsxTranslationRepository {
     /**
      * 为游戏中常见的双行对话窗口生成额外匹配项。
      */
-    private static void addTwoLineWindows(List<BlockLine> block, TranslationStore store) {
+    private static void addTwoLineWindows(List<BlockLine> block, TranslationIndex store) {
         List<Integer> japaneseIndexes = new ArrayList<Integer>();
         for (int i = 0; i < block.size(); i++) {
             if (isUsefulText(block.get(i).japanese)) {
@@ -318,12 +291,7 @@ final class XlsxTranslationRepository {
      * 过滤空行、分隔标记和非实际游戏文本。
      */
     private static boolean isUsefulText(String value) {
-        String text = trim(value);
-        return !text.isEmpty()
-                && !text.startsWith("|---")
-                && !text.startsWith("--图鉴")
-                && !text.startsWith("--２页")
-                && !text.startsWith("--开始");
+        return TranslationText.isUsefulText(value);
     }
 
     /**
@@ -508,413 +476,35 @@ final class XlsxTranslationRepository {
      * 统一文本键格式：NFC、换行规范化、全角空格转半角并裁剪行首尾。
      */
     private static String normalizeText(String value) {
-        if (value == null) {
-            return "";
-        }
-        String normalized = Normalizer.normalize(value, Normalizer.Form.NFC)
-                .replace("\r\n", "\n")
-                .replace('\r', '\n')
-                .replace('\u3000', ' ');
-        String[] lines = normalized.split("\n", -1);
-        StringBuilder result = new StringBuilder();
-        for (String line : lines) {
-            if (result.length() > 0) {
-                result.append('\n');
-            }
-            result.append(trim(line));
-        }
-        return trim(result.toString());
-    }
-
-    /**
-     * 标准精确匹配 key。
-     */
-    private static String normalizeKey(String value) {
-        return normalizeText(value);
-    }
-
-    /**
-     * 去掉所有空白后的紧凑 key，用于容错匹配游戏换行和空格差异。
-     */
-    private static String compactKey(String value) {
-        String normalized = normalizeText(value);
-        StringBuilder result = new StringBuilder();
-        for (int i = 0; i < normalized.length(); i++) {
-            char character = normalized.charAt(i);
-            if (!Character.isWhitespace(character)) {
-                result.append(character);
-            }
-        }
-        return result.toString();
+        return TranslationText.normalize(value);
     }
 
     /**
      * 拼接多行文本并跳过空行。
      */
     private static String join(Collection<String> values) {
-        StringBuilder result = new StringBuilder();
-        for (String value : values) {
-            String normalized = normalizeText(value);
-            if (normalized.isEmpty()) {
-                continue;
-            }
-            if (result.length() > 0) {
-                result.append('\n');
-            }
-            result.append(normalized);
-        }
-        return result.toString();
+        return TranslationText.join(values);
     }
 
     /**
      * 语义别名，表示输入会先标准化再拼接。
      */
     private static String joinNormalized(Collection<String> values) {
-        return join(values);
+        return TranslationText.join(values);
     }
 
     /**
      * 去掉字符串首尾空白；null 按空字符串处理。
      */
     private static String trim(String value) {
-        if (value == null) {
-            return "";
-        }
-        int start = 0;
-        int end = value.length();
-        while (start < end && Character.isWhitespace(value.charAt(start))) {
-            start++;
-        }
-        while (end > start && Character.isWhitespace(value.charAt(end - 1))) {
-            end--;
-        }
-        return value.substring(start, end);
+        return TranslationText.trim(value);
     }
 
     /**
      * 返回第一个非空文本，常用于新版表中翻译列的兜底选择。
      */
     private static String firstNonEmpty(String first, String second) {
-        return trim(first).isEmpty() ? second : first;
-    }
-
-    /**
-     * 判断文本是否包含 <...> 或【...】形式的占位符。
-     */
-    private static boolean hasPlaceholder(String text) {
-        return PLACEHOLDER.matcher(text).find();
-    }
-
-    /**
-     * 翻译数据索引，包含 O(1) 精确匹配、名词表和预编译模板。
-     */
-    private static final class TranslationStore {
-        private final Map<String, String> exact = new HashMap<String, String>();
-        private final Map<String, String> nouns = new HashMap<String, String>();
-        private final Map<Character, List<TemplateEntry>> templates = new HashMap<Character, List<TemplateEntry>>();
-        private final List<TemplateEntry> wildcardTemplates = new ArrayList<TemplateEntry>();
-        private final Set<String> templateKeys = new HashSet<String>();
-
-        /**
-         * 添加普通对话翻译；含占位符文本会编译为模板。
-         */
-        void addEntry(String japanese, String translation) {
-            String source = normalizeText(japanese);
-            String translated = normalizeText(translation);
-            if (!isUsefulText(source) || translated.isEmpty()
-                    || "日文".equals(source) || "翻译".equals(translated)) {
-                return;
-            }
-            if (hasPlaceholder(source)) {
-                addTemplate(source, translated);
-            } else {
-                putIfAbsent(exact, normalizeKey(source), translated);
-                putIfAbsent(exact, compactKey(source), translated);
-            }
-        }
-
-        /**
-         * 添加名词翻译，用于替换模板捕获到的动态值。
-         */
-        void addNoun(String japanese, String translation) {
-            String source = normalizeText(japanese);
-            String translated = normalizeText(translation);
-            if (!isUsefulText(source) || translated.isEmpty()
-                    || "日文".equals(source) || "翻译".equals(translated)) {
-                return;
-            }
-            putIfAbsent(nouns, normalizeKey(source), translated);
-            putIfAbsent(nouns, compactKey(source), translated);
-        }
-
-        /**
-         * 先查精确 key，再按首字符分桶查模板，最后查通配模板。
-         */
-        String translate(String japaneseText) {
-            String normalized = normalizeText(japaneseText);
-            String direct = exact.get(normalizeKey(normalized));
-            if (direct != null) {
-                return direct;
-            }
-            direct = exact.get(compactKey(normalized));
-            if (direct != null) {
-                return direct;
-            }
-
-            char first = firstNonWhitespace(normalized);
-            List<TemplateEntry> candidates = templates.get(first);
-            String matched = matchTemplates(candidates, normalized);
-            if (matched != null) {
-                return matched;
-            }
-            return matchTemplates(wildcardTemplates, normalized);
-        }
-
-        int exactSize() {
-            return exact.size();
-        }
-
-        int nounSize() {
-            return nouns.size();
-        }
-
-        int templateSize() {
-            int size = wildcardTemplates.size();
-            for (List<TemplateEntry> entries : templates.values()) {
-                size += entries.size();
-            }
-            return size;
-        }
-
-        /**
-         * 按固定文本长度排序模板，让更具体的模板优先匹配。
-         */
-        void prepare() {
-            Comparator<TemplateEntry> comparator = new Comparator<TemplateEntry>() {
-                @Override
-                public int compare(TemplateEntry first, TemplateEntry second) {
-                    int fixed = second.fixedLength - first.fixedLength;
-                    if (fixed != 0) {
-                        return fixed;
-                    }
-                    return second.translationFixedLength - first.translationFixedLength;
-                }
-            };
-            Collections.sort(wildcardTemplates, comparator);
-            for (List<TemplateEntry> entries : templates.values()) {
-                Collections.sort(entries, comparator);
-            }
-        }
-
-        /**
-         * 编译并保存一个占位符模板。
-         */
-        private void addTemplate(String japanese, String translation) {
-            String key = japanese + "\u0000" + translation;
-            if (!templateKeys.add(key)) {
-                return;
-            }
-            TemplateEntry entry = TemplateEntry.compile(japanese, translation, this);
-            if (entry.startsWithPlaceholder) {
-                wildcardTemplates.add(entry);
-            } else {
-                List<TemplateEntry> bucket = templates.get(entry.firstLiteral);
-                if (bucket == null) {
-                    bucket = new ArrayList<TemplateEntry>();
-                    templates.put(entry.firstLiteral, bucket);
-                }
-                bucket.add(entry);
-            }
-        }
-
-        /**
-         * 依次尝试候选模板，返回第一个成功翻译结果。
-         */
-        private String matchTemplates(List<TemplateEntry> entries, String japaneseText) {
-            if (entries == null) {
-                return null;
-            }
-            for (TemplateEntry entry : entries) {
-                String translated = entry.tryTranslate(japaneseText);
-                if (translated != null) {
-                    return translated;
-                }
-            }
-            return null;
-        }
-
-        /**
-         * 翻译模板捕获到的动态名词；名词表未命中则保留原文。
-         */
-        private String translateCapturedValue(String value) {
-            String translated = nouns.get(normalizeKey(value));
-            if (translated != null) {
-                return translated;
-            }
-            translated = nouns.get(compactKey(value));
-            return translated == null ? normalizeText(value) : translated;
-        }
-
-        /**
-         * 获取第一个非空白字符，用作模板分桶 key。
-         */
-        private static char firstNonWhitespace(String value) {
-            for (int i = 0; i < value.length(); i++) {
-                char character = value.charAt(i);
-                if (!Character.isWhitespace(character)) {
-                    return character;
-                }
-            }
-            return 0;
-        }
-    }
-
-    /**
-     * 预编译的占位符翻译模板。
-     */
-    private static final class TemplateEntry {
-        final Pattern pattern;
-        final String translationTemplate;
-        final List<String> placeholders;
-        final TranslationStore store;
-        final char firstLiteral;
-        final boolean startsWithPlaceholder;
-        final int fixedLength;
-        final int translationFixedLength;
-
-        private TemplateEntry(Pattern pattern, String translationTemplate, List<String> placeholders,
-                              TranslationStore store, char firstLiteral, boolean startsWithPlaceholder,
-                              int fixedLength, int translationFixedLength) {
-            this.pattern = pattern;
-            this.translationTemplate = translationTemplate;
-            this.placeholders = placeholders;
-            this.store = store;
-            this.firstLiteral = firstLiteral;
-            this.startsWithPlaceholder = startsWithPlaceholder;
-            this.fixedLength = fixedLength;
-            this.translationFixedLength = translationFixedLength;
-        }
-
-        /**
-         * 将含占位符的日文模板编译为正则表达式。
-         */
-        static TemplateEntry compile(String japaneseTemplate, String translationTemplate,
-                                     TranslationStore store) {
-            String normalized = normalizeText(japaneseTemplate);
-            Matcher matcher = PLACEHOLDER.matcher(normalized);
-            StringBuilder regex = new StringBuilder();
-            List<String> placeholders = new ArrayList<String>();
-            regex.append("^\\s*");
-            int index = 0;
-            char firstLiteral = 0;
-            boolean startsWithPlaceholder = false;
-            int fixedLength = 0;
-            while (matcher.find()) {
-                if (matcher.start() == 0) {
-                    startsWithPlaceholder = true;
-                }
-                String literal = normalized.substring(index, matcher.start());
-                fixedLength += literal.replace(" ", "").replace("\n", "").length();
-                if (firstLiteral == 0) {
-                    firstLiteral = firstLiteral(literal);
-                }
-                appendFlexibleLiteral(regex, literal);
-                placeholders.add(matcher.group());
-                regex.append("(.+?)");
-                index = matcher.end();
-            }
-            String tail = normalized.substring(index);
-            fixedLength += tail.replace(" ", "").replace("\n", "").length();
-            if (firstLiteral == 0) {
-                firstLiteral = firstLiteral(tail);
-            }
-            appendFlexibleLiteral(regex, tail);
-            regex.append("\\s*$");
-            return new TemplateEntry(Pattern.compile(regex.toString()), normalizeText(translationTemplate),
-                    placeholders, store, firstLiteral, startsWithPlaceholder || firstLiteral == 0, fixedLength,
-                    fixedTextLength(translationTemplate));
-        }
-
-        /**
-         * 尝试匹配日文文本，并把捕获到的占位符值回填到中文模板。
-         */
-        String tryTranslate(String japaneseText) {
-            Matcher matcher = pattern.matcher(normalizeText(japaneseText));
-            if (!matcher.matches()) {
-                return null;
-            }
-            final Map<String, String> values = new HashMap<String, String>();
-            for (int i = 0; i < placeholders.size(); i++) {
-                String token = placeholders.get(i);
-                if (!values.containsKey(token)) {
-                    values.put(token, store.translateCapturedValue(matcher.group(i + 1)));
-                }
-            }
-            Matcher replacementMatcher = PLACEHOLDER.matcher(translationTemplate);
-            StringBuffer result = new StringBuffer();
-            while (replacementMatcher.find()) {
-                String token = replacementMatcher.group();
-                String value = values.get(token);
-                replacementMatcher.appendReplacement(result,
-                        Matcher.quoteReplacement(value == null ? token : value));
-            }
-            replacementMatcher.appendTail(result);
-            return result.toString();
-        }
-
-        /**
-         * 获取模板开头的第一个字面量字符。
-         */
-        private static char firstLiteral(String value) {
-            for (int i = 0; i < value.length(); i++) {
-                char character = value.charAt(i);
-                if (!Character.isWhitespace(character)) {
-                    return character;
-                }
-            }
-            return 0;
-        }
-
-        /**
-         * 将模板字面量加入正则，空白位置按宽松规则匹配。
-         */
-        private static void appendFlexibleLiteral(StringBuilder regex, String literal) {
-            StringBuilder plain = new StringBuilder();
-            for (int i = 0; i < literal.length(); i++) {
-                char character = literal.charAt(i);
-                if (Character.isWhitespace(character)) {
-                    appendQuoted(regex, plain);
-                    if (character == '\n') {
-                        regex.append("\\s*\\n\\s*");
-                    } else {
-                        regex.append("\\s*");
-                    }
-                } else {
-                    plain.append(character);
-                }
-            }
-            appendQuoted(regex, plain);
-        }
-
-        /**
-         * 将累积的普通文本按字面量追加到正则中。
-         */
-        private static void appendQuoted(StringBuilder regex, StringBuilder plain) {
-            if (plain.length() > 0) {
-                regex.append(Pattern.quote(plain.toString()));
-                plain.setLength(0);
-            }
-        }
-
-        /**
-         * 统计翻译模板中的固定文本长度，用于模板优先级排序。
-         */
-        private static int fixedTextLength(String template) {
-            String normalized = normalizeText(template);
-            Matcher matcher = PLACEHOLDER.matcher(normalized);
-            String withoutPlaceholders = matcher.replaceAll("");
-            return withoutPlaceholders.replace(" ", "").replace("\n", "").length();
-        }
+        return TranslationText.firstNonEmpty(first, second);
     }
 
     /**
@@ -1014,12 +604,4 @@ final class XlsxTranslationRepository {
         }
     }
 
-    /**
-     * 只在 key 非空且尚未存在时写入，避免后续重复行覆盖先前结果。
-     */
-    private static void putIfAbsent(Map<String, String> result, String key, String value) {
-        if (!key.isEmpty() && !result.containsKey(key)) {
-            result.put(key, value);
-        }
-    }
 }

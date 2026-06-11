@@ -1,5 +1,9 @@
 package io.github.xvym.pmocr;
 
+import io.github.xvym.pmocr.ocr.PokemonOcr;
+import io.github.xvym.pmocr.translation.XlsxTranslationRepository;
+import io.github.xvym.pmocr.ui.MainWindow;
+
 import javax.imageio.ImageIO;
 import javax.swing.SwingUtilities;
 import java.awt.GraphicsEnvironment;
