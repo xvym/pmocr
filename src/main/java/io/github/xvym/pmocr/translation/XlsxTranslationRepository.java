@@ -21,8 +21,7 @@ import java.util.zip.ZipInputStream;
  */
 public final class XlsxTranslationRepository {
     private static final String NOT_FOUND = "无文本";
-    private static final String MODERN_TEXT_RESOURCE = "text/text.xlsx";
-    private static final String LEGACY_TEXT_RESOURCE = "text/text_clean.xlsx";
+    private static final String TEXT_RESOURCE = "text/text.xlsx";
     private final TranslationIndex store;
     private final String source;
 
@@ -35,19 +34,15 @@ public final class XlsxTranslationRepository {
      * 加载文本库
      */
     public static XlsxTranslationRepository loadDefault() {
-        String[] resources = {MODERN_TEXT_RESOURCE, LEGACY_TEXT_RESOURCE};
-
-        for (String name : resources) {
-            InputStream resource = XlsxTranslationRepository.class.getResourceAsStream("/" + name);
-            if (resource != null) {
-                try (InputStream input = resource) {
-                    return load(input, "JAR:" + name);
-                } catch (IOException e) {
-                    return empty("JAR:" + name + " 加载失败: " + e.getMessage());
-                }
-            }
+        InputStream resource = XlsxTranslationRepository.class.getResourceAsStream("/" + TEXT_RESOURCE);
+        if (resource == null) {
+            return empty("未找到文本库: " + TEXT_RESOURCE);
         }
-        return empty("未找到文本库");
+        try (InputStream input = resource) {
+            return load(input, "JAR:" + TEXT_RESOURCE);
+        } catch (IOException e) {
+            return empty("JAR:" + TEXT_RESOURCE + " 加载失败: " + e.getMessage());
+        }
     }
 
     /**
@@ -108,34 +103,22 @@ public final class XlsxTranslationRepository {
     }
 
     /**
-     * 读取 XLSX 并根据表结构选择新版或旧版解析逻辑。
+     * 读取并解析统一的 XLSX 文本库结构。
      */
     private static XlsxTranslationRepository load(InputStream input, String source) throws IOException {
         Workbook workbook = readWorkbook(input);
         List<String> sharedStrings = parseSharedStrings(workbook.entry("xl/sharedStrings.xml"));
         TranslationIndex store = new TranslationIndex();
-        if (workbook.hasSheet("对话文本")) {
-            parseLegacyWorkbook(workbook, sharedStrings, store);
-        } else {
-            parseModernWorkbook(workbook, sharedStrings, store);
-        }
+        parseTextWorkbook(workbook, sharedStrings, store);
         store.prepare();
         return new XlsxTranslationRepository(store, source);
     }
 
     /**
-     * 解析旧版 text_clean.xlsx 中的固定对话文本表。
+     * 解析 text.xlsx：先加载名词表，再加载对话和图鉴文本。
      */
-    private static void parseLegacyWorkbook(Workbook workbook, List<String> sharedStrings,
-                                            TranslationIndex store) throws IOException {
-        parseSimpleTextSheet(workbook.entry(workbook.sheetPath("对话文本")), sharedStrings, store, "A", "B");
-    }
-
-    /**
-     * 解析新版 text.xlsx：先加载名词表，再加载对话和图鉴文本。
-     */
-    private static void parseModernWorkbook(Workbook workbook, List<String> sharedStrings,
-                                            TranslationIndex store) throws IOException {
+    private static void parseTextWorkbook(Workbook workbook, List<String> sharedStrings,
+                                          TranslationIndex store) throws IOException {
         for (String sheetName : workbook.sheetNames()) {
             if (isNounSheet(sheetName)) {
                 parseNounSheet(workbook.entry(workbook.sheetPath(sheetName)), sharedStrings, store);
@@ -158,16 +141,6 @@ public final class XlsxTranslationRepository {
                 && !"标".equals(sheetName)
                 && !"Sheet".equals(sheetName)
                 && !sheetName.matches("文\\d+");
-    }
-
-    /**
-     * 解析日文列和翻译列一一对应的简单文本表。
-     */
-    private static void parseSimpleTextSheet(byte[] xml, List<String> sharedStrings, TranslationIndex store,
-                                             String japaneseColumn, String translationColumn) throws IOException {
-        for (RowValues row : parseRows(xml, sharedStrings)) {
-            store.addEntry(row.value(japaneseColumn), row.value(translationColumn));
-        }
     }
 
     /**
@@ -550,10 +523,6 @@ public final class XlsxTranslationRepository {
 
         byte[] entry(String path) {
             return entries.get(path);
-        }
-
-        boolean hasSheet(String sheetName) {
-            return sheets.containsKey(sheetName);
         }
 
         Collection<String> sheetNames() {

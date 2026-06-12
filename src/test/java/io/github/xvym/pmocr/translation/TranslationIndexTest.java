@@ -3,6 +3,7 @@ package io.github.xvym.pmocr.translation;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class TranslationIndexTest {
     @Test
@@ -40,5 +41,13 @@ public class TranslationIndexTest {
         XlsxTranslationRepository repository = XlsxTranslationRepository.fromIndex(index, "test");
 
         assertEquals("无文本", repository.translate("みつからない"));
+    }
+
+    @Test
+    public void defaultRepositoryLoadsMergedTextWorkbook() {
+        XlsxTranslationRepository repository = XlsxTranslationRepository.loadDefault();
+
+        assertEquals("JAR:text/text.xlsx", repository.source());
+        assertTrue(repository.size() > 0);
     }
 }

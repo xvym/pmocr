@@ -34,8 +34,7 @@ java -jar target\pmocr-1.0.0.jar
 
 - `src/main/resources/matrix`：运行时 OCR 字体矩阵。
 - `src/main/resources/font`：字体截图资料，当前不参与运行时识别。
-- `src/main/resources/text/text.xlsx`：内置新版翻译文本库。
-- `src/main/resources/text/text_clean.xlsx`：内置旧版备用翻译文本库。
+- `src/main/resources/text/text.xlsx`：内置翻译文本库。
 - `src/test/resources/testpic`：离线回归截图和标注。
 - `src/test/resources/badcase`：问题样本截图。
 
@@ -69,12 +68,9 @@ Windows 旧版终端若显示日文乱码，可先执行 `chcp 65001`；这只�
 
 ## 翻译文本库
 
-程序启动时会把 JAR 内置翻译文本库预加载到内存。查找顺序如下：
+程序启动时会把 JAR 内置的 `text/text.xlsx` 翻译文本库预加载到内存。
 
-1. JAR 内置的 `text/text.xlsx`
-2. JAR 内置的 `text/text_clean.xlsx`
-
-新版 `text.xlsx` 会读取 `文1` 到 `文10` 的对话文本、`图` 的图鉴文本，以及其他名词 sheet。固定文本进入 `HashMap`，识别后为 O(1) 查找；含 `<PLAYER>`、`<RIVAL>`、`【0】` 等占位符的文本会在启动时预编译为模板，固定文本未命中时再进行模板匹配。模板捕获到的动态值会先查宝可梦、道具、招式、地点等名词表，能翻译则替换为中文，查不到则保留原文。
+`text.xlsx` 会读取 `文1` 到 `文10` 的对话文本、`图` 的图鉴文本，以及其他名词 sheet。固定文本进入 `HashMap`，识别后为 O(1) 查找；含 `<PLAYER>`、`<RIVAL>`、`【0】` 等占位符的文本会在启动时预编译为模板，固定文本未命中时再进行模板匹配。模板捕获到的动态值会先查宝可梦、道具、招式、地点等名词表，能翻译则替换为中文，查不到则保留原文。
 
 命令行可直接测试翻译：
 
