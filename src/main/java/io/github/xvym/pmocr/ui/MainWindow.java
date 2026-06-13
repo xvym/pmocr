@@ -192,7 +192,7 @@ public final class MainWindow extends JFrame {
         setLocationByPlatform(true);
         status.setText("文本库已加载: " + translations.size() + " 条，模板 "
                 + translations.templateSize() + " 条，名词 " + translations.nounSize()
-                + " 条 (" + translations.source() + ")");
+                + " 条 (" + translations.getSource() + ")");
         updateButtons();
     }
 

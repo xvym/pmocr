@@ -86,7 +86,7 @@ public final class PmOcrApp {
         XlsxTranslationRepository translations = XlsxTranslationRepository.loadDefault();
         System.out.println(translations.translate(text.replace("\\n", "\n")));
         System.out.printf("文本库=%s, 条目=%d, 模板=%d, 名词=%d%n",
-                translations.source(), translations.size(), translations.templateSize(), translations.nounSize());
+                translations.getSource(), translations.size(), translations.templateSize(), translations.nounSize());
     }
 
     /**

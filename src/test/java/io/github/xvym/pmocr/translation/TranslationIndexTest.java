@@ -47,7 +47,7 @@ public class TranslationIndexTest {
     public void defaultRepositoryLoadsMergedTextWorkbook() {
         XlsxTranslationRepository repository = XlsxTranslationRepository.loadDefault();
 
-        assertEquals("JAR:text/text.xlsx", repository.source());
+        assertEquals("JAR:text/text.xlsx", repository.getSource());
         assertTrue(repository.size() > 0);
     }
 }

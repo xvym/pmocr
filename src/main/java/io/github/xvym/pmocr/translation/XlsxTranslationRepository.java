@@ -1,5 +1,6 @@
 package io.github.xvym.pmocr.translation;
 
+import lombok.Data;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -9,7 +10,10 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -19,6 +23,7 @@ import java.util.zip.ZipInputStream;
  * @Date: 2026/6/9
  * @Description: 从 XLSX 文本库加载日文对话和中文翻译，并支持固定文本与占位符模板匹配。
  */
+@Data
 public final class XlsxTranslationRepository {
     private static final String NOT_FOUND = "无文本";
     private static final String TEXT_RESOURCE = "text/text.xlsx";
@@ -34,14 +39,16 @@ public final class XlsxTranslationRepository {
      * 加载文本库
      */
     public static XlsxTranslationRepository loadDefault() {
-        InputStream resource = XlsxTranslationRepository.class.getResourceAsStream("/" + TEXT_RESOURCE);
-        if (resource == null) {
-            return empty("未找到文本库: " + TEXT_RESOURCE);
-        }
-        try (InputStream input = resource) {
-            return load(input, "JAR:" + TEXT_RESOURCE);
-        } catch (IOException e) {
-            return empty("JAR:" + TEXT_RESOURCE + " 加载失败: " + e.getMessage());
+        try (InputStream input = XlsxTranslationRepository.class.getResourceAsStream("/" + TEXT_RESOURCE)) {
+            // 读取文本库文件
+            Workbook workbook = readWorkbook(input);
+            List<String> sharedStrings = parseSharedStrings(workbook.entry("xl/sharedStrings.xml"));
+            TranslationIndex store = new TranslationIndex();
+            parseTextWorkbook(workbook, sharedStrings, store);
+            store.prepare();
+            return new XlsxTranslationRepository(store, String.format("JAR:%s", TEXT_RESOURCE));
+        } catch (Exception e) {
+            return new XlsxTranslationRepository(new TranslationIndex(), String.format("JAR:%s 加载失败:%s", TEXT_RESOURCE, e.getMessage()));
         }
     }
 
@@ -49,7 +56,7 @@ public final class XlsxTranslationRepository {
      * 翻译 OCR 得到的日文文本。优先整体匹配，失败后按行拆分匹配。
      */
     public String translate(String japaneseText) {
-        String normalized = normalizeText(japaneseText);
+        String normalized = TranslationText.normalize(japaneseText);
         if (normalized.isEmpty()) {
             return NOT_FOUND;
         }
@@ -89,27 +96,7 @@ public final class XlsxTranslationRepository {
         return store.templateSize();
     }
 
-    public String source() {
-        return source;
-    }
-
-    private static XlsxTranslationRepository empty(String source) {
-        return new XlsxTranslationRepository(new TranslationIndex(), source);
-    }
-
     static XlsxTranslationRepository fromIndex(TranslationIndex store, String source) {
-        store.prepare();
-        return new XlsxTranslationRepository(store, source);
-    }
-
-    /**
-     * 读取并解析统一的 XLSX 文本库结构。
-     */
-    private static XlsxTranslationRepository load(InputStream input, String source) throws IOException {
-        Workbook workbook = readWorkbook(input);
-        List<String> sharedStrings = parseSharedStrings(workbook.entry("xl/sharedStrings.xml"));
-        TranslationIndex store = new TranslationIndex();
-        parseTextWorkbook(workbook, sharedStrings, store);
         store.prepare();
         return new XlsxTranslationRepository(store, source);
     }
@@ -117,8 +104,7 @@ public final class XlsxTranslationRepository {
     /**
      * 解析 text.xlsx：先加载名词表，再加载对话和图鉴文本。
      */
-    private static void parseTextWorkbook(Workbook workbook, List<String> sharedStrings,
-                                          TranslationIndex store) throws IOException {
+    private static void parseTextWorkbook(Workbook workbook, List<String> sharedStrings, TranslationIndex store) throws IOException {
         for (String sheetName : workbook.sheetNames()) {
             if (isNounSheet(sheetName)) {
                 parseNounSheet(workbook.entry(workbook.sheetPath(sheetName)), sharedStrings, store);
@@ -218,10 +204,10 @@ public final class XlsxTranslationRepository {
         List<String> translationLines = new ArrayList<String>();
         for (BlockLine line : block) {
             if (isUsefulText(line.japanese)) {
-                japaneseLines.add(normalizeText(line.japanese));
+                japaneseLines.add(TranslationText.normalize(line.japanese));
             }
             if (isUsefulText(line.translation)) {
-                translationLines.add(normalizeText(line.translation));
+                translationLines.add(TranslationText.normalize(line.translation));
             }
             store.addEntry(line.japanese, line.translation);
         }
@@ -271,17 +257,14 @@ public final class XlsxTranslationRepository {
      * 将 XLSX 当作 zip 读取，只保留解析文本所需的 XML 条目。
      */
     private static Workbook readWorkbook(InputStream input) throws IOException {
-        Map<String, byte[]> entries = new HashMap<String, byte[]>();
-        ZipInputStream zip = new ZipInputStream(input);
-        try {
+        Map<String, byte[]> entries = new HashMap<>();
+        try (ZipInputStream zip = new ZipInputStream(input)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
                 if (!entry.isDirectory() && shouldReadEntry(entry.getName())) {
                     entries.put(entry.getName(), readAll(zip));
                 }
             }
-        } finally {
-            closeQuietly(zip);
         }
         return new Workbook(entries);
     }
@@ -300,7 +283,7 @@ public final class XlsxTranslationRepository {
      * 解析 XLSX sharedStrings.xml，得到共享字符串表。
      */
     private static List<String> parseSharedStrings(byte[] xml) throws IOException {
-        List<String> result = new ArrayList<String>();
+        List<String> result = new ArrayList<>();
         if (xml == null) {
             return result;
         }
@@ -433,23 +416,6 @@ public final class XlsxTranslationRepository {
             output.write(buffer, 0, read);
         }
         return output.toByteArray();
-    }
-
-    /**
-     * 安静关闭资源，用于 zip 流清理路径。
-     */
-    private static void closeQuietly(Closeable closeable) {
-        try {
-            closeable.close();
-        } catch (IOException ignored) {
-        }
-    }
-
-    /**
-     * 统一文本键格式：NFC、换行规范化、全角空格转半角并裁剪行首尾。
-     */
-    private static String normalizeText(String value) {
-        return TranslationText.normalize(value);
     }
 
     /**
