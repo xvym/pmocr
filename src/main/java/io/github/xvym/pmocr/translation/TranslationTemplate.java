@@ -32,8 +32,8 @@ final class TranslationTemplate {
 
     static TranslationTemplate compile(String japaneseTemplate, String translationTemplate,
                                        TranslationIndex index) {
-        String normalized = TranslationText.normalize(japaneseTemplate);
-        Matcher matcher = TranslationText.PLACEHOLDER.matcher(normalized);
+        String normalized = TranslationTextUtils.normalize(japaneseTemplate);
+        Matcher matcher = TranslationTextUtils.PLACEHOLDER.matcher(normalized);
         StringBuilder regex = new StringBuilder();
         List<String> placeholders = new ArrayList<String>();
         regex.append("^\\s*");
@@ -63,12 +63,12 @@ final class TranslationTemplate {
         appendFlexibleLiteral(regex, tail);
         regex.append("\\s*$");
         return new TranslationTemplate(Pattern.compile(regex.toString()),
-                TranslationText.normalize(translationTemplate), placeholders, index, firstLiteral,
+                TranslationTextUtils.normalize(translationTemplate), placeholders, index, firstLiteral,
                 startsWithPlaceholder || firstLiteral == 0, fixedLength, fixedTextLength(translationTemplate));
     }
 
     String tryTranslate(String japaneseText) {
-        Matcher matcher = pattern.matcher(TranslationText.normalize(japaneseText));
+        Matcher matcher = pattern.matcher(TranslationTextUtils.normalize(japaneseText));
         if (!matcher.matches()) {
             return null;
         }
@@ -79,7 +79,7 @@ final class TranslationTemplate {
                 values.put(token, index.translateCapturedValue(matcher.group(i + 1)));
             }
         }
-        Matcher replacementMatcher = TranslationText.PLACEHOLDER.matcher(translationTemplate);
+        Matcher replacementMatcher = TranslationTextUtils.PLACEHOLDER.matcher(translationTemplate);
         StringBuffer result = new StringBuffer();
         while (replacementMatcher.find()) {
             String token = replacementMatcher.group();
@@ -127,8 +127,8 @@ final class TranslationTemplate {
     }
 
     private static int fixedTextLength(String template) {
-        String normalized = TranslationText.normalize(template);
-        Matcher matcher = TranslationText.PLACEHOLDER.matcher(normalized);
+        String normalized = TranslationTextUtils.normalize(template);
+        Matcher matcher = TranslationTextUtils.PLACEHOLDER.matcher(normalized);
         String withoutPlaceholders = matcher.replaceAll("");
         return withoutPlaceholders.replace(" ", "").replace("\n", "").length();
     }

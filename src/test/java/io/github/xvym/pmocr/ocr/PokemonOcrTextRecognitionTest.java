@@ -1,5 +1,7 @@
 package io.github.xvym.pmocr.ocr;
 
+import io.github.xvym.pmocr.translation.TranslationIndex;
+import io.github.xvym.pmocr.translation.TranslationTextUtils;
 import org.junit.Test;
 
 import javax.imageio.ImageIO;
@@ -10,11 +12,10 @@ import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class PokemonOcrTextRecognitionTest {
+
     @Test
     public void recognizesTextFromBundledSamples() throws IOException {
         PokemonOcr ocr = new PokemonOcr();
@@ -40,9 +41,8 @@ public class PokemonOcrTextRecognitionTest {
     }
 
     private static byte[] readResource(String name) throws IOException {
-        InputStream input = PokemonOcrTextRecognitionTest.class.getClassLoader().getResourceAsStream(name);
-        assertNotNull("missing resource " + name, input);
-        try {
+        try (InputStream input = PokemonOcrTextRecognitionTest.class.getClassLoader().getResourceAsStream(name)) {
+            assertNotNull("missing resource " + name, input);
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             byte[] buffer = new byte[1024];
             int read;
@@ -50,8 +50,6 @@ public class PokemonOcrTextRecognitionTest {
                 output.write(buffer, 0, read);
             }
             return output.toByteArray();
-        } finally {
-            input.close();
         }
     }
 

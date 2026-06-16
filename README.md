@@ -19,7 +19,7 @@
 - Maven 3.x
 - Windows、Linux 或 macOS 图形桌面
 
-项目没有第三方运行时依赖。首次 Maven 构建是否需要联网只取决于本机是否已有 Maven 默认插件缓存；生成的 JAR 运行时完全离线。
+项目使用 Apache POI 读取内置 Excel 文本库，首次 Maven 构建需要本机已有依赖缓存或允许 Maven 下载依赖；生成的 shaded JAR 运行时完全离线。
 
 ## 构建与启动
 
@@ -34,7 +34,7 @@ java -jar target\pmocr-1.0.0.jar
 
 - `src/main/resources/matrix`：运行时 OCR 字体矩阵。
 - `src/main/resources/font`：字体截图资料，当前不参与运行时识别。
-- `src/main/resources/text/text.xlsx`：内置翻译文本库。
+- `src/main/resources/text/text_clean_1.xlsx`：内置翻译文本库。
 - `src/test/resources/testpic`：离线回归截图和标注。
 - `src/test/resources/badcase`：问题样本截图。
 
@@ -68,9 +68,9 @@ Windows 旧版终端若显示日文乱码，可先执行 `chcp 65001`；这只�
 
 ## 翻译文本库
 
-程序启动时会把 JAR 内置的 `text/text.xlsx` 翻译文本库预加载到内存。
+程序启动时会把 JAR 内置的 `text/text_clean_1.xlsx` 翻译文本库预加载到内存。
 
-`text.xlsx` 会读取 `文1` 到 `文10` 的对话文本、`图` 的图鉴文本，以及其他名词 sheet。固定文本进入 `HashMap`，识别后为 O(1) 查找；含 `<PLAYER>`、`<RIVAL>`、`【0】` 等占位符的文本会在启动时预编译为模板，固定文本未命中时再进行模板匹配。模板捕获到的动态值会先查宝可梦、道具、招式、地点等名词表，能翻译则替换为中文，查不到则保留原文。
+`text_clean_1.xlsx` 使用统一表头：`文本` sheet 读取 `日文` 和 `翻译` 列，其他 sheet 作为名词表读取同名列。固定文本进入 `HashMap`，识别后为 O(1) 查找；含 `<PLAYER>`、`<RIVAL>`、`【0】` 等占位符的文本会在启动时预编译为模板，固定文本未命中时再进行模板匹配。模板捕获到的动态值会先查宝可梦、道具、招式、地点等名词表，能翻译则替换为中文，查不到则保留原文。
 
 命令行可直接测试翻译：
 

@@ -1,16 +1,23 @@
 package io.github.xvym.pmocr.translation;
 
+import org.apache.commons.lang3.StringUtils;
+
 import java.text.Normalizer;
-import java.util.Collection;
 import java.util.regex.Pattern;
 
-final class TranslationText {
+public final class TranslationTextUtils {
     static final Pattern PLACEHOLDER = Pattern.compile("<[^>]+>|【[^】]+】");
 
-    private TranslationText() {
+    private TranslationTextUtils() {
     }
 
-    static String normalize(String value) {
+    /**
+     * 规范化字符串，由于对换行特殊处理，不能使用StringUtils来替代
+     *
+     * @param value
+     * @return
+     */
+    public static String normalize(String value) {
         if (value == null) {
             return "";
         }
@@ -24,16 +31,15 @@ final class TranslationText {
             if (result.length() > 0) {
                 result.append('\n');
             }
-            result.append(trim(line));
+            if (StringUtils.isEmpty(line)) {
+                continue;
+            }
+            result.append(StringUtils.trim(line));
         }
         return trim(result.toString());
     }
 
-    static String normalizeKey(String value) {
-        return normalize(value);
-    }
-
-    static String compactKey(String value) {
+    public static String compact(String value) {
         String normalized = normalize(value);
         StringBuilder result = new StringBuilder();
         for (int i = 0; i < normalized.length(); i++) {
@@ -45,22 +51,7 @@ final class TranslationText {
         return result.toString();
     }
 
-    static String join(Collection<String> values) {
-        StringBuilder result = new StringBuilder();
-        for (String value : values) {
-            String normalized = normalize(value);
-            if (normalized.isEmpty()) {
-                continue;
-            }
-            if (result.length() > 0) {
-                result.append('\n');
-            }
-            result.append(normalized);
-        }
-        return result.toString();
-    }
-
-    static String trim(String value) {
+    public static String trim(String value) {
         if (value == null) {
             return "";
         }
@@ -75,20 +66,22 @@ final class TranslationText {
         return value.substring(start, end);
     }
 
-    static String firstNonEmpty(String first, String second) {
-        return trim(first).isEmpty() ? second : first;
-    }
-
-    static boolean hasPlaceholder(String text) {
+    public static boolean hasPlaceholder(String text) {
         return PLACEHOLDER.matcher(text).find();
     }
 
-    static boolean isUsefulText(String value) {
+    public static String fixedLiteral(String text) {
+        String normalized = normalize(text);
+        String withoutPlaceholders = PLACEHOLDER.matcher(normalized).replaceAll("");
+        return compact(withoutPlaceholders);
+    }
+
+    public static boolean isUsefulText(String value) {
         String text = trim(value);
-        return !text.isEmpty()
-                && !text.startsWith("|---")
-                && !text.startsWith("--图鉴")
-                && !text.startsWith("--２页")
-                && !text.startsWith("--开始");
+        return text.isEmpty()
+                || text.startsWith("|---")
+                || text.startsWith("--图鉴")
+                || text.startsWith("--２页")
+                || text.startsWith("--开始");
     }
 }

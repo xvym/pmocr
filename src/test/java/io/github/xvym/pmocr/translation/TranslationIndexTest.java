@@ -3,7 +3,6 @@ package io.github.xvym.pmocr.translation;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 public class TranslationIndexTest {
     @Test
@@ -26,11 +25,21 @@ public class TranslationIndexTest {
     }
 
     @Test
+    public void placeholderOnlyTemplatesDoNotCatchAllText() {
+        TranslationIndex index = new TranslationIndex();
+        index.addEntry("【0】", "使出了【0】");
+        index.prepare();
+
+        assertEquals(null, index.translate("みつからない"));
+    }
+
+    @Test
     public void repositoryFallsBackToLineByLineLookup() {
         TranslationIndex index = new TranslationIndex();
         index.addEntry("あい", "第一句");
         index.addEntry("うえ", "第二句");
-        XlsxTranslationRepository repository = XlsxTranslationRepository.fromIndex(index, "test");
+        index.prepare();
+        XlsxTranslationRepository repository = new XlsxTranslationRepository(index);
 
         assertEquals("第一句\n第二句", repository.translate(" あい \n うえ "));
     }
@@ -38,7 +47,8 @@ public class TranslationIndexTest {
     @Test
     public void repositoryReturnsNotFoundForUnknownText() {
         TranslationIndex index = new TranslationIndex();
-        XlsxTranslationRepository repository = XlsxTranslationRepository.fromIndex(index, "test");
+        index.prepare();
+        XlsxTranslationRepository repository = new XlsxTranslationRepository(index);
 
         assertEquals("无文本", repository.translate("みつからない"));
     }
@@ -47,7 +57,7 @@ public class TranslationIndexTest {
     public void defaultRepositoryLoadsMergedTextWorkbook() {
         XlsxTranslationRepository repository = XlsxTranslationRepository.loadDefault();
 
-        assertEquals("JAR:text/text.xlsx", repository.getSource());
-        assertTrue(repository.size() > 0);
+        assertEquals("早上好！", repository.translate("おはよう　ございます！"));
+        assertEquals("无文本", repository.translate("みつからない"));
     }
 }
